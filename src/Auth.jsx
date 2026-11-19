@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import HangingLanyardCard from './HangingLanyardCard';
+import { sendOtp, registerUser, loginUser } from './api/auth';
 import {
   ChevronLeft,
   Eye,
@@ -11,14 +12,11 @@ import {
   AlertCircle,
   FileText,
   X,
-  Calendar,
   Sparkles,
   Copy,
   Check,
   Code2,
   ShieldCheck,
-  Ticket,
-  Bot,
   ChevronDown,
   Phone,
   Building2,
@@ -41,7 +39,7 @@ export default function Auth({ previewMode = 'desktop' }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const isMobileLayout = previewMode === 'mobile' || windowWidth < 768;
+  const isMobileLayout = previewMode === 'mobile' || windowWidth < 1024;
 
   // Mobile Continuous Scroll Progress (0 to 1)
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -72,21 +70,12 @@ export default function Auth({ previewMode = 'desktop' }) {
 
   // Smooth scroll trigger to login/create account section (100% full screen scroll)
   const triggerSmoothScroll = () => {
-    if (!loginSectionRef.current) return;
-
-    if (
-      scrollContainerRef.current &&
-      scrollContainerRef.current.scrollHeight > scrollContainerRef.current.clientHeight + 20
-    ) {
-      // 100% exact scroll to top of login section so zero orange or ID card peeks
-      const targetTop = loginSectionRef.current.offsetTop;
-      scrollContainerRef.current.scrollTo({
-        top: targetTop,
-        behavior: 'smooth',
-      });
-    } else {
-      loginSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (!loginSectionRef.current || !scrollContainerRef.current) return;
+    const targetTop = loginSectionRef.current.offsetTop || scrollContainerRef.current.clientHeight;
+    scrollContainerRef.current.scrollTo({
+      top: targetTop,
+      behavior: 'smooth',
+    });
   };
 
   const handleScroll = (e) => {
@@ -120,25 +109,14 @@ export default function Auth({ previewMode = 'desktop' }) {
     }
 
     if (isMobileLayout) {
-      setCountdown(3);
       setAutoScrollActive(true);
-
-      countdownIntervalRef.current = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
 
       autoScrollTimerRef.current = setTimeout(() => {
         if (!userInteractedRef.current) {
           triggerSmoothScroll();
         }
         setAutoScrollActive(false);
-      }, 3000);
+      }, 750);
     } else {
       setAutoScrollActive(false);
     }
@@ -216,7 +194,7 @@ export default function Auth({ previewMode = 'desktop' }) {
     }, 1000);
   };
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     if (!registerEmail.trim()) {
       setRegisterErrors((prev) => ({
         ...prev,
@@ -238,14 +216,24 @@ export default function Auth({ previewMode = 'desktop' }) {
       return copy;
     });
 
-    setOtpDigits(['', '', '', '', '', '']);
+    setOtpLoading(true);
     setOtpError('');
-    setIsOtpSent(true);
-    startOtpCountdown();
-
-    setTimeout(() => {
-      otpRefs.current[0]?.focus();
-    }, 100);
+    try {
+      await sendOtp(registerEmail.trim());
+      setOtpDigits(['', '', '', '', '', '']);
+      setIsOtpSent(true);
+      startOtpCountdown();
+      setTimeout(() => {
+        otpRefs.current[0]?.focus();
+      }, 100);
+    } catch (err) {
+      setRegisterErrors((prev) => ({
+        ...prev,
+        email: err.message || 'Failed to send OTP to your email',
+      }));
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   const handleOtpChange = (index, value) => {
@@ -307,12 +295,20 @@ export default function Auth({ previewMode = 'desktop' }) {
     }, 600);
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (!canResendOtp) return;
     setOtpDigits(['', '', '', '', '', '']);
     setOtpError('');
-    startOtpCountdown();
-    otpRefs.current[0]?.focus();
+    setOtpLoading(true);
+    try {
+      await sendOtp(registerEmail.trim());
+      startOtpCountdown();
+      otpRefs.current[0]?.focus();
+    } catch (err) {
+      setOtpError(err.message || 'Failed to resend OTP');
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   // File Upload Handlers
@@ -370,7 +366,7 @@ export default function Auth({ previewMode = 'desktop' }) {
   };
 
   // LOG IN SUBMISSION
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     const errors = {};
 
@@ -394,15 +390,28 @@ export default function Auth({ previewMode = 'desktop' }) {
     setLoginErrors({});
     setLoginLoading(true);
 
-    setTimeout(() => {
-      setLoginLoading(false);
+    try {
+      const response = await loginUser({
+        email: loginEmail,
+        password: loginPassword,
+      });
+
       setLoginSuccess(true);
+      if (response?.data?.user) {
+        localStorage.setItem('eventhub_user', JSON.stringify(response.data.user));
+      }
       setTimeout(() => setLoginSuccess(false), 3500);
-    }, 900);
+    } catch (err) {
+      setLoginErrors({
+        server: err.message || 'Invalid email or password',
+      });
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
-  // CREATE ACCOUNT SUBMISSION (FASTAPI FORMDATA)
-  const handleRegisterSubmit = (e) => {
+  // CREATE ACCOUNT SUBMISSION
+  const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     const errors = {};
 
@@ -418,10 +427,11 @@ export default function Auth({ previewMode = 'desktop' }) {
       errors.email = 'Please verify your college email with the 6-digit OTP';
     }
 
-    if (!phoneNumber.trim()) {
+    const cleanPhone = phoneNumber.trim().replace(/[\s-]/g, '');
+    if (!cleanPhone) {
       errors.phoneNumber = 'Phone number is required';
-    } else if (!/^[+]?[0-9\s-]{10,14}$/.test(phoneNumber.trim())) {
-      errors.phoneNumber = 'Please enter a valid phone number (e.g., +919845012345)';
+    } else if (!/^[+]?[0-9]{10,15}$/.test(cleanPhone)) {
+      errors.phoneNumber = 'Please enter a valid 10-15 digit phone number (e.g. 9845012345)';
     }
 
     if (!collegeName.trim()) {
@@ -461,32 +471,24 @@ export default function Auth({ previewMode = 'desktop' }) {
     setRegisterErrors({});
     setRegisterLoading(true);
 
-    const formData = new FormData();
-    formData.append('name', fullName.trim());
-    formData.append('email', registerEmail.trim());
-    formData.append('phonenumber', phoneNumber.trim());
-    formData.append('collegename', collegeName.trim());
-    formData.append('department', deptValue);
-    formData.append('password', registerPassword);
-    formData.append('role', role);
-    formData.append('otp', otpDigits.join('') || '123456');
-
-    if (role === 'faculty') {
-      formData.append('id_number', idNumber.trim());
-      formData.append('id_proof', idProofFile);
-    }
-
-    setTimeout(() => {
-      setRegisterLoading(false);
-      setSubmittedData({
+    try {
+      const otpCode = otpDigits.join('').trim();
+      const payload = {
         name: fullName.trim(),
         email: registerEmail.trim(),
-        phonenumber: phoneNumber.trim(),
+        phonenumber: cleanPhone,
         collegename: collegeName.trim(),
         department: deptValue,
-        password: '••••••••••••',
+        password: registerPassword,
         role: role,
-        otp: otpDigits.join('') || '123456',
+        otp: otpCode,
+      };
+
+      await registerUser(payload);
+
+      setSubmittedData({
+        ...payload,
+        password: '••••••••••••',
         ...(role === 'faculty' && idProofFile
           ? {
               id_number: idNumber.trim(),
@@ -497,13 +499,20 @@ export default function Auth({ previewMode = 'desktop' }) {
               },
             }
           : {
-              id_number: 'N/A (Student Direct Access)',
+              id_number: 'N/A',
               id_proof: null,
             }),
         timestamp: new Date().toLocaleTimeString(),
       });
       setShowPayloadModal(true);
-    }, 1000);
+      setLoginEmail(registerEmail.trim());
+    } catch (err) {
+      setRegisterErrors({
+        server: err.message || 'Registration failed. Please check your details.',
+      });
+    } finally {
+      setRegisterLoading(false);
+    }
   };
 
   const copyFastApiCode = () => {
@@ -552,44 +561,28 @@ async def register(
   };
 
   return (
-    <div className="w-full flex justify-center items-center py-1 sm:py-3">
-      {/* 
-        Responsive Split-Screen Container:
-        - Animated width transitions between Desktop (1040px), Tablet (768px), and Mobile (400px)
-        - On Mobile: Natural vertical scroll with continuous 3D depth parallax & bottom-sheet reveal
-      */}
+    <div className="w-full h-screen min-h-screen overflow-hidden flex flex-col lg:flex-row bg-[#FF6B00] lg:bg-white relative">
+      {/* Outer Scroll Container for Mobile / Full Screen Viewport */}
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
         onTouchStart={handleUserInteraction}
         onMouseDown={handleUserInteraction}
         onWheel={handleUserInteraction}
-        className={`w-full bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl border border-gray-200/90 overflow-hidden transition-all duration-500 ease-in-out ${
-          isMobileLayout
-            ? 'max-w-[400px] h-[640px] max-h-[88vh] overflow-y-auto scroll-smooth'
-            : previewMode === 'tablet'
-            ? 'max-w-[768px]'
-            : 'max-w-[1040px]'
+        className={`w-full h-full flex flex-col lg:flex-row transition-all duration-500 ease-in-out relative ${
+          isMobileLayout ? 'overflow-y-auto scroll-smooth no-scrollbar' : 'overflow-hidden'
         }`}
       >
+        {/* ========================================================
+            LEFT PANEL: 100dvh ON MOBILE / 30% WIDTH ON DESKTOP
+           ======================================================== */}
         <div
-          className={`flex flex-col ${
-            isMobileLayout ? '' : 'md:grid md:grid-cols-2'
-          } min-h-[640px] relative transition-all duration-500`}
+          className={`bg-gradient-to-b from-[#FF7A1A] via-[#FF6B00] to-[#E65100] relative px-4 sm:px-6 lg:px-8 pt-5 pb-6 text-white overflow-hidden transition-all duration-500 flex flex-col justify-between border-r border-orange-600/30 ${
+            isMobileLayout
+              ? 'w-full h-[100dvh] min-h-[100dvh] max-h-[100dvh] flex-shrink-0'
+              : 'w-full lg:w-[34%] xl:w-[29%] min-w-[340px] max-w-[440px] h-full flex-shrink-0 shadow-lg'
+          }`}
         >
-          
-          {/* ========================================================
-              LEFT PANEL: REALISTIC HANGING LANYARD ID CARD SHOWCASE
-              - Mobile: 100% full-screen hero section (640px full height)
-              - Desktop/Tablet: Dedicated Left Column
-             ======================================================== */}
-          <div
-            className={`bg-gradient-to-b from-[#FF7A1A] via-[#FF6B00] to-[#E65100] relative px-4 pt-4 text-white overflow-hidden transition-all duration-500 ${
-              isMobileLayout
-                ? 'min-h-[640px] h-[640px] pb-6 flex flex-col justify-between flex-shrink-0'
-                : 'pb-6 sm:p-7 lg:p-8 rounded-b-[32px] md:rounded-b-none md:rounded-l-[32px] flex flex-col justify-between'
-            }`}
-          >
             {/* Ambient Translucent Orange/White Light Orbs (With Upward Parallax Drift) */}
             <div
               className="absolute top-2 -left-8 w-28 h-14 bg-white/20 rounded-full blur-[1px] pointer-events-none transition-transform duration-150 ease-out"
@@ -626,26 +619,8 @@ async def register(
             <div className="absolute top-16 left-8 text-white/70 text-[10px] select-none">✦</div>
             <div className="absolute top-14 right-8 text-white/70 text-[10px] select-none">✦</div>
 
-            {/* Top Brand Header Bar */}
-            <div className="relative z-20 flex items-center justify-between w-full mb-1">
-              {/* EventHub Brand Pill */}
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white shadow-sm">
-                <Calendar className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span className="text-xs font-extrabold tracking-tight">EventHub</span>
-                <span className="text-[9px] bg-white/20 px-1.5 py-0.2 rounded-full font-bold ml-1">
-                  PASS
-                </span>
-              </div>
-
-              {/* Tag indicator */}
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-white/90 bg-black/15 px-2.5 py-0.5 rounded-full border border-white/15">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
-                <span>Interactive 3D Badge</span>
-              </div>
-            </div>
-
             {/* Hanging Lanyard Assembly (3D Depth Recede Applied in Real-Time via scrollProgress) */}
-            <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-auto">
+            <div className="relative z-10 flex flex-col items-center justify-center flex-1 my-auto w-full overflow-hidden">
               <HangingLanyardCard
                 scrollProgress={scrollProgress}
                 isMobile={isMobileLayout}
@@ -656,58 +631,50 @@ async def register(
             {/* Subtle Animated Auto-Scroll / Scroll Hint (Fades out immediately once scrolling begins) */}
             {isMobileLayout && (
               <div
-                className="relative z-20 flex flex-col items-center justify-center pt-1 transition-opacity duration-200"
+                className="relative z-20 flex flex-col items-center justify-center pt-2 pb-2 transition-opacity duration-200"
                 style={{
                   opacity: Math.max(1 - scrollProgress * 3.5, 0),
                   pointerEvents: scrollProgress > 0.1 ? 'none' : 'auto',
                 }}
               >
-                <div className="flex items-center gap-2 text-[11px] font-bold text-white bg-black/25 px-3.5 py-1.5 rounded-full backdrop-blur-md shadow-sm border border-white/20 select-none">
+                <button
+                  type="button"
+                  onClick={triggerSmoothScroll}
+                  className="flex items-center gap-2 text-[11px] font-bold text-white bg-black/25 px-4 py-2 rounded-full backdrop-blur-md shadow-sm border border-white/20 select-none cursor-pointer active:scale-95 transition-all"
+                >
                   {autoScrollActive ? (
                     <>
                       <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-300 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                       </span>
-                      <span>Auto-scrolling to Log in in {countdown}s...</span>
+                      <span>
+                        {isLoginView ? 'Auto-scrolling to Log in...' : 'Auto-scrolling to Create Account...'}
+                      </span>
                     </>
                   ) : (
                     <>
-                      <span>Scroll down to log in</span>
+                      <span>
+                        {isLoginView ? 'Scroll down to log in' : 'Scroll down to Create Account'}
+                      </span>
                     </>
                   )}
                   <ChevronDown className="w-3.5 h-3.5 animate-bounce" />
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Value Props for Desktop/Tablet */}
-            {!isMobileLayout && (
-              <div className="relative z-10 hidden md:flex items-center justify-around pt-3 border-t border-white/20 text-xs text-white/90">
-                <div className="flex items-center gap-1.5">
-                  <Ticket className="w-3.5 h-3.5 text-orange-200" />
-                  <span className="text-[11px] font-medium">Digital Campus Pass</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5 text-orange-200" />
-                  <span className="text-[11px] font-medium">AI Agent Powered</span>
-                </div>
+                </button>
               </div>
             )}
           </div>
 
 
           {/* ========================================================
-              RIGHT PANEL: AUTHENTICATION FORM (Log In / Create Account)
-              - Mobile: 100% full-screen pure white login screen (640px full height, zero orange leftover at top)
-              - Desktop/Tablet: Dedicated Right Column
+              RIGHT PANEL (70% WIDTH ON DESKTOP): AUTHENTICATION FORM
              ======================================================== */}
           <div
             ref={loginSectionRef}
-            className={`bg-white p-6 sm:p-8 lg:p-10 flex flex-col justify-start overflow-y-auto transition-all duration-350 ease-out ${
+            className={`bg-white flex flex-col justify-between overflow-y-auto transition-all duration-350 ease-out border-l border-gray-100 ${
               isMobileLayout
-                ? 'min-h-[640px] w-full relative z-20 flex-shrink-0'
-                : 'bg-[#F8F9FA] justify-center'
+                ? 'w-full min-h-[100dvh] relative z-20 flex-shrink-0 p-6 sm:p-8'
+                : 'flex-1 h-full bg-white px-8 sm:px-12 lg:px-14 xl:px-20 py-8 lg:py-10 overflow-y-auto'
             }`}
           >
             {/* Mobile View Top Navigation Bar: View EventHub Pass */}
@@ -733,33 +700,10 @@ async def register(
             )}
             {isLoginView ? (
               /* ================= VIEW 1: LOG IN VIEW ================= */
-              <div className="animate-view-fade w-full max-w-md mx-auto">
+              <div className="animate-view-fade w-full max-w-[430px] mx-auto my-auto py-2">
                 
-                {/* Header Row: Circular Back Button & Title */}
+                {/* Title */}
                 <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!isLoginView) {
-                          setIsLoginView(true);
-                        } else if (isMobileLayout && scrollContainerRef.current) {
-                          scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-                        }
-                      }}
-                      className="w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 cursor-pointer"
-                      aria-label="Back"
-                      title={isMobileLayout ? "Scroll back to ID Card" : "Back"}
-                    >
-                      <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                    </button>
-
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF7ED] border border-[#FED7AA] text-[#FF6B00]">
-                      <Calendar className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span className="text-xs font-bold tracking-tight">EventHub</span>
-                    </div>
-                  </div>
-
                   <h1 className="text-[28px] sm:text-[32px] font-bold text-[#111827] tracking-tight leading-tight">
                     Log in
                   </h1>
@@ -776,6 +720,13 @@ async def register(
                   <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
                     <span>Login successful! Welcome back to EventHub.</span>
+                  </div>
+                )}
+
+                {loginErrors.server && (
+                  <div className="mb-4 p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    <span>{loginErrors.server}</span>
                   </div>
                 )}
 
@@ -867,44 +818,8 @@ async def register(
                   </button>
                 </form>
 
-                {/* Horizontal "Or" Divider */}
-                <div className="relative my-5">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-[#E5E7EB]"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="bg-[#F8F9FA] px-3 text-[#9CA3AF] font-medium">Or</span>
-                  </div>
-                </div>
-
-                {/* Sign in with Google Button */}
-                <button
-                  type="button"
-                  className="w-full h-12 rounded-xl border border-[#E5E7EB] bg-white hover:bg-gray-50 active:scale-[0.985] text-[#111827] text-sm font-medium flex items-center justify-center gap-3 shadow-sm transition-all cursor-pointer"
-                >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.66-5.17 3.66-9.12z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.13C3.26 21.36 7.33 24 12 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.25C.45 8.17 0 9.99 0 12s.45 3.83 1.25 5.42l4.03-3.13z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.13c.95-2.83 3.6-4.96 6.72-4.96z"
-                    />
-                  </svg>
-                  <span>Sign in with Google</span>
-                </button>
-
                 {/* Bottom Switch Link: Switch to Create Account */}
-                <div className="mt-5 text-center">
+                <div className="mt-6 text-center">
                   <p className="text-[13px] text-[#6B7280]">
                     Don't have an account?{' '}
                     <button
@@ -930,26 +845,10 @@ async def register(
               </div>
             ) : (
               /* ================= VIEW 2: CREATE ACCOUNT VIEW ================= */
-              <div className="animate-view-fade w-full max-w-md mx-auto">
+              <div className="animate-view-fade w-full max-w-[430px] mx-auto my-auto py-2">
                 
-                {/* Header Row: Circular Back Button & Title */}
+                {/* Title */}
                 <div className="mb-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <button
-                      type="button"
-                      onClick={() => setIsLoginView(true)}
-                      className="w-10 h-10 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center text-gray-700 shadow-sm hover:bg-gray-50 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/30 cursor-pointer"
-                      aria-label="Back to Log in"
-                    >
-                      <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-                    </button>
-
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF7ED] border border-[#FED7AA] text-[#FF6B00]">
-                      <Calendar className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span className="text-xs font-bold tracking-tight">EventHub</span>
-                    </div>
-                  </div>
-
                   <h1 className="text-[28px] sm:text-[32px] font-bold text-[#111827] tracking-tight leading-tight">
                     Create Account
                   </h1>
@@ -1364,7 +1263,6 @@ async def register(
                         </div>
                         <div>
                           <div className="text-xs font-bold text-gray-900">Student</div>
-                          <div className="text-[10px] text-[#6B7280]">Instant pass • No ID upload</div>
                         </div>
                       </button>
 
@@ -1403,28 +1301,10 @@ async def register(
                         </div>
                         <div>
                           <div className="text-xs font-bold text-gray-900">Faculty</div>
-                          <div className="text-[10px] text-[#6B7280]">Requires Faculty ID upload</div>
                         </div>
                       </button>
                     </div>
                   </div>
-
-                  {/* Student Mode: Instant Pass Benefit Notice (NO ID Upload or Box) */}
-                  {role === 'student' && (
-                    <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/90 flex items-center gap-2.5 animate-view-fade">
-                      <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-emerald-900">
-                          Direct Student Access Activated
-                        </p>
-                        <p className="text-[11px] text-emerald-700 leading-tight mt-0.5">
-                          No ID card upload needed! Your verified college email unlocks instant campus passes, fests, and event registrations.
-                        </p>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Faculty Mode: Requires Faculty Employee ID & ID Card Upload Dropzone */}
                   {role === 'faculty' && (
@@ -1563,6 +1443,13 @@ async def register(
                     </div>
                   )}
 
+                  {registerErrors.server && (
+                    <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                      <span>{registerErrors.server}</span>
+                    </div>
+                  )}
+
                   {/* Primary Orange Pill Button: "Create Account" */}
                   <button
                     type="submit"
@@ -1595,10 +1482,13 @@ async def register(
                 </div>
               </div>
             )}
-          </div>
 
+            {/* Subtle Brand Footer pinned to bottom */}
+            <footer className="w-full max-w-md mx-auto mt-auto pt-10 pb-1 text-center text-[11px] text-gray-400 select-none flex-shrink-0">
+              <p>© {new Date().getFullYear()} EventHub • College Event Management Platform</p>
+            </footer>
+          </div>
         </div>
-      </div>
 
       {/* ================= FASTAPI FORMDATA INSPECTOR MODAL ================= */}
       {showPayloadModal && submittedData && (
@@ -1610,9 +1500,9 @@ async def register(
                   <ShieldCheck className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold">FastAPI FormData Prepared</h3>
+                  <h3 className="text-base font-bold">Account Created Successfully</h3>
                   <p className="text-xs text-orange-100">
-                    Multipart/form-data packaged successfully
+                    Registered & verified with backend API
                   </p>
                 </div>
               </div>
@@ -1630,10 +1520,10 @@ async def register(
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-bold text-emerald-900">
-                    Validation Passed & FormData Ready
+                    Account Created & Verified!
                   </p>
                   <p className="text-xs text-emerald-700 mt-0.5">
-                    Credentials, role, and ID proof have been formatted into a multipart <code>FormData</code> object ready for <code>POST /api/auth/register</code>.
+                    Your profile has been registered in the EventHub database. You can now log in to access your dashboard.
                   </p>
                 </div>
               </div>
@@ -1690,7 +1580,7 @@ async def register(
                     </div>
                   ) : (
                     <span className="text-[10px] font-sans font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      Not required (Student Direct Pass)
+                      Not required for Student
                     </span>
                   )}
                 </div>
