@@ -95,32 +95,32 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
         {/* --- 1. LANYARD STRAP (Hanging from top edge) --- */}
         <div className="relative flex flex-col items-center">
           {/* Main Woven Texture Strap with printed EVENTHUB */}
-          <div className="w-8 sm:w-9 h-11 sm:h-13 bg-gradient-to-b from-[#C43E00] via-[#FF6B00] to-[#E65100] shadow-md relative overflow-hidden flex flex-col items-center justify-between border-x border-[#9E3300]/40">
+          <div className="w-9 sm:w-10 lg:w-11 h-12 sm:h-14 lg:h-16 bg-gradient-to-b from-[#C43E00] via-[#FF6B00] to-[#E65100] shadow-md relative overflow-hidden flex flex-col items-center justify-between border-x border-[#9E3300]/40">
             {/* Woven fabric texture pattern */}
             <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(45deg,#000,#000_2px,transparent_2px,transparent_4px)]"></div>
             
             {/* Printed EVENTHUB branding running vertically */}
-            <div className="relative z-10 flex flex-col items-center justify-around h-full py-1 text-white font-extrabold text-[8px] tracking-[0.25em] rotate-180 opacity-95 [writing-mode:vertical-rl]">
+            <div className="relative z-10 flex flex-col items-center justify-around h-full py-1 text-white font-extrabold text-[8px] sm:text-[9px] tracking-[0.25em] rotate-180 opacity-95 [writing-mode:vertical-rl]">
               <span>EVENTHUB</span>
             </div>
           </div>
 
           {/* Small Woven Side Tag / Badge Clip labeled "EVENTHUB" */}
-          <div className="absolute -right-5 sm:-right-6 top-3 sm:top-4 bg-white border border-gray-200 text-[#FF6B00] px-1.5 py-0.5 rounded-sm shadow-sm flex items-center gap-1 font-black text-[7px] tracking-wider uppercase rotate-12 z-20">
+          <div className="absolute -right-5 sm:-right-6 top-3 sm:top-4 bg-white border border-gray-200 text-[#FF6B00] px-1.5 py-0.5 rounded-sm shadow-sm flex items-center gap-1 font-black text-[7px] sm:text-[8px] tracking-wider uppercase rotate-12 z-20">
             <span>EVENTHUB</span>
           </div>
 
           {/* --- 2. METALLIC SWIVEL HOOK / CLIP ASSEMBLY --- */}
           <div className="flex flex-col items-center -mt-0.5 z-10">
             {/* Metal Strap Clamp */}
-            <div className="w-5 h-2 bg-gradient-to-r from-gray-400 via-gray-200 to-gray-500 rounded-xs shadow-xs border border-gray-400"></div>
+            <div className="w-5 sm:w-6 h-2 sm:h-2.5 bg-gradient-to-r from-gray-400 via-gray-200 to-gray-500 rounded-xs shadow-xs border border-gray-400"></div>
 
             {/* Metal Swivel Ring */}
-            <div className="w-3.5 h-3.5 rounded-full border-2 border-gray-300 bg-transparent -mt-1 shadow-inner"></div>
+            <div className="w-3.5 sm:w-4 h-3.5 sm:h-4 rounded-full border-2 border-gray-300 bg-transparent -mt-1 shadow-inner"></div>
 
             {/* Chrome Swivel Hook / Lobster Clasp */}
-            <div className="w-3 h-4.5 bg-gradient-to-r from-gray-300 via-white to-gray-400 rounded-t-xs rounded-b-sm border border-gray-400 shadow-sm flex items-center justify-center -mt-1">
-              <div className="w-1 h-2.5 bg-gray-500 rounded-full"></div>
+            <div className="w-3.5 sm:w-4 h-4.5 sm:h-5 bg-gradient-to-r from-gray-300 via-white to-gray-400 rounded-t-xs rounded-b-sm border border-gray-400 shadow-sm flex items-center justify-center -mt-1">
+              <div className="w-1 sm:w-1.5 h-2.5 sm:h-3 bg-gray-500 rounded-full"></div>
             </div>
           </div>
         </div>
@@ -148,7 +148,7 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
               onCardInteract?.();
               setIsFlipped((prev) => !prev);
             }}
-            className={`w-[260px] sm:w-[270px] lg:w-[275px] h-[375px] sm:h-[390px] lg:h-[400px] relative preserve-3d cursor-pointer group ${
+            className={`w-[300px] sm:w-[330px] lg:w-[350px] xl:w-[370px] h-[435px] sm:h-[475px] lg:h-[500px] xl:h-[525px] relative preserve-3d cursor-pointer group ${
               isFlipped ? 'rotate-y-180' : ''
             }`}
             style={{
@@ -160,99 +160,99 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
             {/* =========================================================
                 FRONT SIDE (Theme-Matched Clean ID Card — No Photo)
                ========================================================= */}
-            <div className="absolute inset-0 w-full h-full backface-hidden rounded-2xl bg-white shadow-2xl border border-gray-200/90 overflow-hidden flex flex-col justify-between text-gray-900 select-none">
+            <div className="absolute inset-0 w-full h-full backface-hidden rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-gray-200/90 overflow-hidden flex flex-col justify-between text-gray-900 select-none">
               
               {/* TOP SECTION: Slot Cutout & Orange Header Band */}
-              <div className="bg-gradient-to-r from-[#FF7A1A] to-[#FF6B00] pt-2 pb-2 px-3.5 text-white relative">
+              <div className="bg-gradient-to-r from-[#FF7A1A] to-[#FF6B00] pt-2.5 pb-2.5 px-4 sm:px-5 text-white relative">
                 {/* Punch-hole cutout slot for the lanyard clip */}
-                <div className="w-11 h-2.5 bg-[#421700]/70 rounded-full mx-auto mb-1.5 border border-black/30 shadow-inner flex items-center justify-center">
+                <div className="w-12 h-3 bg-[#421700]/70 rounded-full mx-auto mb-2 border border-black/30 shadow-inner flex items-center justify-center">
                   <div className="w-4 h-1 bg-[#1A0A00] rounded-full"></div>
                 </div>
 
                 {/* Brand Header Band */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center text-white">
-                      <Calendar className="w-3 h-3 stroke-[2.5]" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-5.5 h-5.5 rounded-md bg-white/20 backdrop-blur-sm flex items-center justify-center text-white">
+                      <Calendar className="w-3.5 h-3.5 stroke-[2.5]" />
                     </div>
-                    <span className="font-extrabold text-sm tracking-tight">EVENTHUB</span>
+                    <span className="font-extrabold text-sm sm:text-base tracking-tight">EVENTHUB</span>
                   </div>
 
                   {/* Official Pass Pill */}
-                  <span className="text-[9px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full border border-white/30 text-white">
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-white/25 px-2.5 py-0.5 rounded-full border border-white/30 text-white">
                     OFFICIAL PASS
                   </span>
                 </div>
               </div>
 
               {/* CENTER VISUAL: Sleek Glowing Orange Emblem + Brand Punchlines */}
-              <div className="px-4 py-1.5 flex flex-col items-center text-center my-auto">
+              <div className="px-5 py-3 sm:py-4 flex flex-col items-center text-center my-auto">
                 {/* Glowing Brand Emblem */}
-                <div className="relative mb-2">
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-[#FF6B00] via-[#FF8533] to-[#FFA066] p-[2px] shadow-lg shadow-orange-500/25 group-hover:scale-105 transition-transform duration-300">
-                    <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center relative overflow-hidden">
+                <div className="relative mb-3">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-22 lg:h-22 rounded-2xl bg-gradient-to-tr from-[#FF6B00] via-[#FF8533] to-[#FFA066] p-[2.5px] shadow-lg shadow-orange-500/25 group-hover:scale-105 transition-transform duration-300">
+                    <div className="w-full h-full bg-white rounded-[13px] sm:rounded-[14px] flex items-center justify-center relative overflow-hidden">
                       <div className="absolute inset-0 bg-orange-50/70"></div>
-                      <CalendarDays className="w-7 h-7 sm:w-8 sm:h-8 text-[#FF6B00] stroke-[2.2] relative z-10" />
+                      <CalendarDays className="w-8 h-8 sm:w-10 sm:h-10 lg:w-11 lg:h-11 text-[#FF6B00] stroke-[2.2] relative z-10" />
                     </div>
                   </div>
                 </div>
 
                 {/* Headline */}
-                <h3 className="text-base font-extrabold text-[#111827] tracking-tight">
+                <h3 className="text-lg sm:text-xl font-extrabold text-[#111827] tracking-tight">
                   EventHub
                 </h3>
 
                 {/* Bold Catchy Punchline 1 */}
-                <p className="text-[12px] font-bold text-gray-900 leading-snug mt-1 max-w-[220px]">
+                <p className="text-[13px] sm:text-[14px] lg:text-[15px] font-bold text-gray-900 leading-snug mt-1.5 max-w-[270px]">
                   "Where Campus Culture <span className="text-[#FF6B00]">Connects</span>."
                 </p>
 
                 {/* Catchy Punchline 2 */}
-                <p className="text-[10px] text-gray-500 mt-1 max-w-[210px] leading-relaxed">
+                <p className="text-[11px] sm:text-[12px] text-gray-500 mt-1 max-w-[260px] leading-relaxed">
                   Discover upcoming events, collaborate with teams, and never miss out on campus action.
                 </p>
               </div>
 
               {/* BOTTOM SECTION: Mini Metadata Grid, Barcode & "Flip for more" Pill */}
-              <div className="px-3.5 pb-2.5 pt-2 bg-[#FBFBFC] border-t border-gray-100">
+              <div className="px-4 sm:px-5 pb-3 pt-2.5 bg-[#FBFBFC] border-t border-gray-100">
                 {/* Metadata Grid */}
-                <div className="grid grid-cols-3 gap-1 pb-1.5 border-b border-gray-200/60 font-mono text-[8px] text-gray-500 uppercase tracking-tighter">
+                <div className="grid grid-cols-3 gap-1.5 pb-2 border-b border-gray-200/60 font-mono text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-tighter">
                   <div>
-                    <span className="block text-[7px] text-gray-400">PLATFORM</span>
-                    <span className="font-bold text-gray-800 truncate block">EventHub</span>
+                    <span className="block text-[7.5px] sm:text-[8px] text-gray-400">PLATFORM</span>
+                    <span className="font-bold text-gray-800 truncate block text-[9.5px] sm:text-[11px]">EventHub</span>
                   </div>
                   <div>
-                    <span className="block text-[7px] text-gray-400">ACCESS</span>
-                    <span className="font-bold text-[#FF6B00] truncate block">All Campus</span>
+                    <span className="block text-[7.5px] sm:text-[8px] text-gray-400">ACCESS</span>
+                    <span className="font-bold text-[#FF6B00] truncate block text-[9.5px] sm:text-[11px]">All Campus</span>
                   </div>
                   <div>
-                    <span className="block text-[7px] text-gray-400">PASS</span>
-                    <span className="font-bold text-gray-800 truncate block">Official 2026</span>
+                    <span className="block text-[7.5px] sm:text-[8px] text-gray-400">PASS</span>
+                    <span className="font-bold text-gray-800 truncate block text-[9.5px] sm:text-[11px]">Official 2026</span>
                   </div>
                 </div>
 
                 {/* Barcode & Flip Indicator Row */}
-                <div className="flex items-center justify-between pt-1.5">
+                <div className="flex items-center justify-between pt-2">
                   {/* Decorative Barcode */}
-                  <div className="flex items-center gap-[2px] opacity-80" title="Pass Barcode">
-                    <div className="w-[2px] h-4 bg-gray-900"></div>
-                    <div className="w-[1px] h-4 bg-gray-900"></div>
-                    <div className="w-[3px] h-4 bg-gray-900"></div>
-                    <div className="w-[1px] h-4 bg-gray-900"></div>
-                    <div className="w-[2px] h-4 bg-gray-900"></div>
-                    <div className="w-[1px] h-4 bg-gray-900"></div>
-                    <div className="w-[3px] h-4 bg-gray-900"></div>
-                    <div className="w-[2px] h-4 bg-gray-900"></div>
-                    <div className="w-[1px] h-4 bg-gray-900"></div>
-                    <div className="w-[2px] h-4 bg-gray-900"></div>
-                    <div className="w-[1px] h-4 bg-gray-900"></div>
-                    <div className="w-[3px] h-4 bg-gray-900"></div>
+                  <div className="flex items-center gap-[2.5px] opacity-80" title="Pass Barcode">
+                    <div className="w-[2px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[1px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[3.5px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[1px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[2px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[1.5px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[3px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[2px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[1px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[2.5px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[1px] h-5 sm:h-6 bg-gray-900"></div>
+                    <div className="w-[3px] h-5 sm:h-6 bg-gray-900"></div>
                   </div>
 
                   {/* "Flip for more" Pill Indicator */}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 group-hover:bg-[#FF6B00] border border-[#FED7AA] group-hover:border-[#FF6B00] text-[#FF6B00] group-hover:text-white text-[10px] font-bold transition-all shadow-xs">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 group-hover:bg-[#FF6B00] border border-[#FED7AA] group-hover:border-[#FF6B00] text-[#FF6B00] group-hover:text-white text-[10.5px] sm:text-[11.5px] font-bold transition-all shadow-xs">
                     <span>Flip for more</span>
-                    <RotateCcw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />
+                    <RotateCcw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" />
                   </div>
                 </div>
               </div>
@@ -263,25 +263,25 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
             {/* =========================================================
                 BACK SIDE (Tap-Anywhere Two-Way Flip Back + Contacts)
                ========================================================= */}
-            <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-2xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col justify-between text-gray-900 select-none">
+            <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-gray-200 overflow-hidden flex flex-col justify-between text-gray-900 select-none">
               
               {/* TOP SECTION: Slot Cutout & Magnetic-stripe Style Orange Header */}
               <div>
                 {/* Slot Cutout Area */}
-                <div className="pt-2 pb-1 bg-gray-50 border-b border-gray-100">
-                  <div className="w-11 h-2.5 bg-[#421700]/70 rounded-full mx-auto border border-black/30 shadow-inner flex items-center justify-center">
+                <div className="pt-2 pb-1.5 bg-gray-50 border-b border-gray-100">
+                  <div className="w-12 h-3 bg-[#421700]/70 rounded-full mx-auto border border-black/30 shadow-inner flex items-center justify-center">
                     <div className="w-4 h-1 bg-[#1A0A00] rounded-full"></div>
                   </div>
                 </div>
 
                 {/* Magnetic-stripe style orange accent bar */}
-                <div className="bg-gradient-to-r from-[#FF6B00] to-[#E65100] px-3.5 py-1.5 text-white flex items-center justify-between">
-                  <span className="text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                <div className="bg-gradient-to-r from-[#FF6B00] to-[#E65100] px-4 sm:px-5 py-2 text-white flex items-center justify-between">
+                  <span className="text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-widest flex items-center gap-1.5">
                     HOST AN EVENT • EVENTHUB
                   </span>
                   
                   {/* Subtle Flip Back Pill */}
-                  <span className="text-[9px] font-bold text-white/90 bg-black/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-white/90 bg-black/20 px-2 py-0.5 rounded-full flex items-center gap-1">
                     <span>Front</span>
                     <RotateCcw className="w-2.5 h-2.5" />
                   </span>
@@ -289,30 +289,30 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
               </div>
 
               {/* CARD BODY */}
-              <div className="px-3.5 py-2.5 flex-1 overflow-y-auto space-y-3.5">
+              <div className="px-4 sm:px-5 py-3 flex-1 overflow-y-auto space-y-3.5 sm:space-y-4">
                 
                 {/* 1. HOSTABLE CAMPUS EVENTS (More Events Added) */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[9.5px] font-bold text-gray-800 uppercase tracking-tight flex items-center gap-1">
-                      <CalendarDays className="w-3 h-3 text-[#FF6B00]" />
+                    <span className="text-[10px] sm:text-[11px] font-bold text-gray-800 uppercase tracking-tight flex items-center gap-1.5">
+                      <CalendarDays className="w-3.5 h-3.5 text-[#FF6B00]" />
                       Hostable Campus Events
                     </span>
-                    <span className="text-[7.5px] font-bold text-[#FF6B00] bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-200">
+                    <span className="text-[8px] sm:text-[9px] font-bold text-[#FF6B00] bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
                       Live on Campus
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-1.5 text-[9px] font-semibold text-gray-800">
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[9.5px] sm:text-[10.5px] font-semibold text-gray-800">
                     {hostableEvents.map((evt) => {
                       const IconComp = evt.icon;
                       return (
                         <div
                           key={evt.id}
-                          className="bg-gray-50 hover:bg-orange-50/70 border border-gray-100 hover:border-orange-200 rounded-lg px-2 py-1.5 flex items-center gap-2 transition-colors shadow-2xs"
+                          className="bg-gray-50 hover:bg-orange-50/70 border border-gray-100 hover:border-orange-200 rounded-lg px-2.5 py-1.5 sm:py-2 flex items-center gap-2 transition-colors shadow-2xs"
                         >
-                          <div className="w-5 h-5 rounded-md bg-white border border-gray-200/80 flex items-center justify-center flex-shrink-0 text-[#FF6B00] shadow-xs">
-                            <IconComp className="w-3 h-3 stroke-[2.2]" />
+                          <div className="w-5.5 h-5.5 rounded-md bg-white border border-gray-200/80 flex items-center justify-center flex-shrink-0 text-[#FF6B00] shadow-xs">
+                            <IconComp className="w-3.5 h-3.5 stroke-[2.2]" />
                           </div>
                           <span className="truncate">{evt.label}</span>
                         </div>
@@ -323,23 +323,23 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
 
                 {/* 2. FOR CUSTOM EVENTS, CONTACT US (Generous Space & Divider) */}
                 <div className="pt-2.5 border-t border-gray-100">
-                  <div className="flex items-center gap-1.5 text-[9.5px] font-bold text-gray-800 uppercase tracking-tight mb-2">
+                  <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-gray-800 uppercase tracking-tight mb-2">
                     <Mail className="w-3.5 h-3.5 text-[#FF6B00]" />
                     <span>For Custom Events, Contact Us:</span>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {contactEmails.map((item) => (
                       <div
                         key={item.id}
-                        className="px-2.5 py-1.5 rounded-xl bg-orange-50/70 border border-orange-100 hover:border-orange-300 transition-colors flex items-center justify-between group/contact"
+                        className="px-3 py-2 rounded-xl bg-orange-50/70 border border-orange-100 hover:border-orange-300 transition-colors flex items-center justify-between group/contact"
                       >
-                        <div className="overflow-hidden pr-1.5 flex-1 min-w-0">
-                          <span className="text-[9.5px] font-bold text-gray-800 uppercase tracking-tight block leading-tight">
+                        <div className="overflow-hidden pr-2 flex-1 min-w-0">
+                          <span className="text-[10px] sm:text-[11px] font-bold text-gray-800 uppercase tracking-tight block leading-tight">
                             {item.name}
                           </span>
                           <span
-                            className="text-[10.5px] font-semibold text-gray-700 truncate font-mono block select-all mt-0.5"
+                            className="text-[11px] sm:text-[12px] font-semibold text-gray-700 truncate font-mono block select-all mt-0.5"
                             title={item.email}
                           >
                             {item.email}
@@ -349,7 +349,7 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
                         <button
                           type="button"
                           onClick={(e) => handleCopy(e, item.email, item.id)}
-                          className={`p-1.5 rounded-lg text-xs transition-colors cursor-pointer flex-shrink-0 ${
+                          className={`p-1.5 sm:p-2 rounded-lg text-xs transition-colors cursor-pointer flex-shrink-0 ${
                             copiedId === item.id
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-white hover:bg-gray-100 text-gray-600 border border-gray-200'
@@ -357,9 +357,9 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
                           title="Copy email"
                         >
                           {copiedId === item.id ? (
-                            <Check className="w-3 h-3 text-emerald-600" />
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
                           ) : (
-                            <Copy className="w-3 h-3 text-gray-500" />
+                            <Copy className="w-3.5 h-3.5 text-gray-500" />
                           )}
                         </button>
                       </div>
@@ -370,7 +370,7 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
               </div>
 
               {/* PROMINENT BUTTON: "Host an Event • Book a Call" */}
-              <div className="p-2.5 bg-gray-50/80 border-t border-gray-100 flex flex-col items-center">
+              <div className="p-3 bg-gray-50/80 border-t border-gray-100 flex flex-col items-center">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -379,14 +379,14 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
                     setQuickDate(1);
                     setIsScheduleOpen(true);
                   }}
-                  className="w-full py-2.5 px-3 rounded-full bg-[#FF6B00] hover:bg-[#EA5E00] active:scale-[0.985] text-white font-bold text-[11px] shadow-float transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-2.5 sm:py-3 px-3.5 rounded-full bg-[#FF6B00] hover:bg-[#EA5E00] active:scale-[0.985] text-white font-bold text-xs sm:text-sm shadow-float transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <CalendarDays className="w-3.5 h-3.5" />
+                  <CalendarDays className="w-4 h-4" />
                   <span>Host an Event • Book a Call</span>
-                  <ArrowRight className="w-3 h-3" />
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
 
-                <p className="text-[9px] text-gray-400 mt-1 text-center">
+                <p className="text-[9.5px] sm:text-[10.5px] text-gray-400 mt-1.5 text-center">
                   Tap anywhere on card to flip back
                 </p>
               </div>

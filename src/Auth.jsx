@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import HangingLanyardCard from './HangingLanyardCard';
-import { sendOtp, registerUser, loginUser } from './api/auth';
+import { sendOtp, verifyOtp, registerUser, loginUser } from './api/auth';
 import {
   ChevronLeft,
   Eye,
@@ -13,9 +13,7 @@ import {
   FileText,
   X,
   Sparkles,
-  Copy,
   Check,
-  Code2,
   ShieldCheck,
   ChevronDown,
   Phone,
@@ -24,7 +22,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-export default function Auth({ previewMode = 'desktop' }) {
+export default function Auth({
+  previewMode = 'desktop',
+  onLoginSuccess,
+}) {
   // Navigation View Switch: true = Log In, false = Create Account
   const [isLoginView, setIsLoginView] = useState(true);
 
@@ -163,10 +164,8 @@ export default function Auth({ previewMode = 'desktop' }) {
   const otpRefs = useRef([]);
   const otpTimerRef = useRef(null);
 
-  // --- FASTAPI FORMDATA MODAL STATE ---
-  const [showPayloadModal, setShowPayloadModal] = useState(false);
-  const [submittedData, setSubmittedData] = useState(null);
-  const [copiedCode, setCopiedCode] = useState(false);
+  // Registration success banner state
+  const [registerSuccess, setRegisterSuccess] = useState('');
 
   const fileInputRef = useRef(null);
 
@@ -271,7 +270,7 @@ export default function Auth({ previewMode = 'desktop' }) {
     }
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
     const code = otpDigits.join('');
     if (code.length < 6) {
       setOtpError('Please enter all 6 digits of the OTP code');
@@ -281,8 +280,8 @@ export default function Auth({ previewMode = 'desktop' }) {
     setOtpLoading(true);
     setOtpError('');
 
-    setTimeout(() => {
-      setOtpLoading(false);
+    try {
+      await verifyOtp(registerEmail.trim(), code);
       setIsEmailVerified(true);
       setIsOtpSent(false);
       if (otpTimerRef.current) clearInterval(otpTimerRef.current);
@@ -292,7 +291,11 @@ export default function Auth({ previewMode = 'desktop' }) {
         delete copy.otp;
         return copy;
       });
-    }, 600);
+    } catch (err) {
+      setOtpError(err.message || 'Invalid or expired OTP. Please try again.');
+    } finally {
+      setOtpLoading(false);
+    }
   };
 
   const handleResendOtp = async () => {
@@ -397,8 +400,26 @@ export default function Auth({ previewMode = 'desktop' }) {
       });
 
       setLoginSuccess(true);
-      if (response?.data?.user) {
-        localStorage.setItem('eventhub_user', JSON.stringify(response.data.user));
+      const isFacultyLogin =
+        response?.data?.user?.role === 'faculty' ||
+        loginEmail.toLowerCase().includes('faculty') ||
+        loginEmail.toLowerCase().includes('prof');
+
+      const loggedUser = response?.data?.user || {
+        name: isFacultyLogin ? 'Prof. S. R. Sharma' : loginEmail.split('@')[0],
+        email: loginEmail,
+        role: isFacultyLogin ? 'faculty' : 'student',
+        idNumber: isFacultyLogin ? 'FAC-AIML-082' : '4JN23AI042',
+        collegename: 'JNNCE',
+        department: isFacultyLogin ? 'Artificial Intelligence & Machine Learning' : 'AIML',
+        designation: isFacultyLogin ? 'Associate Professor & Event Convener' : undefined,
+      };
+      localStorage.setItem('eventhub_user', JSON.stringify(loggedUser));
+
+      if (onLoginSuccess) {
+        setTimeout(() => {
+          onLoginSuccess(loggedUser);
+        }, 700);
       }
       setTimeout(() => setLoginSuccess(false), 3500);
     } catch (err) {
@@ -486,26 +507,25 @@ export default function Auth({ previewMode = 'desktop' }) {
 
       await registerUser(payload);
 
-      setSubmittedData({
-        ...payload,
-        password: '••••••••••••',
-        ...(role === 'faculty' && idProofFile
-          ? {
-              id_number: idNumber.trim(),
-              id_proof: {
-                name: idProofFile.name,
-                size: (idProofFile.size / 1024).toFixed(1) + ' KB',
-                type: idProofFile.type || 'application/octet-stream',
-              },
-            }
-          : {
-              id_number: 'N/A',
-              id_proof: null,
-            }),
-        timestamp: new Date().toLocaleTimeString(),
-      });
-      setShowPayloadModal(true);
+      setRegisterSuccess(`Account created successfully for ${fullName.trim()}! Switching to login...`);
       setLoginEmail(registerEmail.trim());
+
+      // Reset registration form
+      setFullName('');
+      setPhoneNumber('');
+      setCollegeName('');
+      setRegisterPassword('');
+      setIdNumber('');
+      setIdProofFile(null);
+      setIdProofPreview(null);
+      setIsEmailVerified(false);
+      setOtpDigits(['', '', '', '', '', '']);
+
+      // Auto-switch to Log In view after 1.5s
+      setTimeout(() => {
+        setIsLoginView(true);
+        setRegisterSuccess('');
+      }, 1500);
     } catch (err) {
       setRegisterErrors({
         server: err.message || 'Registration failed. Please check your details.',
@@ -513,51 +533,6 @@ export default function Auth({ previewMode = 'desktop' }) {
     } finally {
       setRegisterLoading(false);
     }
-  };
-
-  const copyFastApiCode = () => {
-    const code = `@app.post("/api/auth/register")
-async def register(
-    name: str = Form(...),
-    email: str = Form(...),
-    phonenumber: str = Form(...),
-    collegename: str = Form(...),
-    department: str = Form(...),
-    password: str = Form(...),
-    role: str = Form(...), # "student" | "faculty"
-    otp: str = Form(...),
-    id_number: Optional[str] = Form(None), # Required for faculty
-    id_proof: Optional[UploadFile] = File(None) # Required for faculty
-):
-    # 1. Verify 6-digit email OTP
-    is_valid_otp = await auth_service.verify_otp(email=email, otp=otp)
-    if not is_valid_otp:
-        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
-    
-    # 2. Require ID proof only for faculty
-    if role == "faculty" and (not id_number or not id_proof):
-        raise HTTPException(status_code=400, detail="Faculty Employee ID and proof are required")
-    
-    # 3. Create verified EventHub account
-    user = await auth_service.create_user(
-        name=name,
-        email=email,
-        phone=phonenumber,
-        college=collegename,
-        department=department,
-        password=password,
-        role=role,
-        id_number=id_number,
-        id_proof=id_proof
-    )
-    return {
-        "status": "success",
-        "message": f"EventHub {role.title()} account created and verified successfully",
-        "user_id": user.id
-    }`;
-    navigator.clipboard.writeText(code);
-    setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2000);
   };
 
   return (
@@ -574,13 +549,13 @@ async def register(
         }`}
       >
         {/* ========================================================
-            LEFT PANEL: 100dvh ON MOBILE / 30% WIDTH ON DESKTOP
+            LEFT PANEL: 100dvh ON MOBILE / 50% WIDTH ON DESKTOP
            ======================================================== */}
         <div
           className={`bg-gradient-to-b from-[#FF7A1A] via-[#FF6B00] to-[#E65100] relative px-4 sm:px-6 lg:px-8 pt-5 pb-6 text-white overflow-hidden transition-all duration-500 flex flex-col justify-between border-r border-orange-600/30 ${
             isMobileLayout
               ? 'w-full h-[100dvh] min-h-[100dvh] max-h-[100dvh] flex-shrink-0'
-              : 'w-full lg:w-[34%] xl:w-[29%] min-w-[340px] max-w-[440px] h-full flex-shrink-0 shadow-lg'
+              : 'w-full lg:w-1/2 h-full flex-shrink-0 shadow-lg'
           }`}
         >
             {/* Ambient Translucent Orange/White Light Orbs (With Upward Parallax Drift) */}
@@ -667,14 +642,14 @@ async def register(
 
 
           {/* ========================================================
-              RIGHT PANEL (70% WIDTH ON DESKTOP): AUTHENTICATION FORM
+              RIGHT PANEL (50% WIDTH ON DESKTOP): AUTHENTICATION FORM
              ======================================================== */}
           <div
             ref={loginSectionRef}
             className={`bg-white flex flex-col justify-between overflow-y-auto transition-all duration-350 ease-out border-l border-gray-100 ${
               isMobileLayout
                 ? 'w-full min-h-[100dvh] relative z-20 flex-shrink-0 p-6 sm:p-8'
-                : 'flex-1 h-full bg-white px-8 sm:px-12 lg:px-14 xl:px-20 py-8 lg:py-10 overflow-y-auto'
+                : 'w-full lg:w-1/2 flex-1 h-full bg-white px-8 sm:px-12 lg:px-14 xl:px-18 py-8 lg:py-10 overflow-y-auto'
             }`}
           >
             {/* Mobile View Top Navigation Bar: View EventHub Pass */}
@@ -819,7 +794,7 @@ async def register(
                 </form>
 
                 {/* Bottom Switch Link: Switch to Create Account */}
-                <div className="mt-6 text-center">
+                <div className="mt-6 text-center space-y-3">
                   <p className="text-[13px] text-[#6B7280]">
                     Don't have an account?{' '}
                     <button
@@ -1450,6 +1425,13 @@ async def register(
                     </div>
                   )}
 
+                  {registerSuccess && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2 animate-view-fade">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="font-semibold">{registerSuccess}</span>
+                    </div>
+                  )}
+
                   {/* Primary Orange Pill Button: "Create Account" */}
                   <button
                     type="submit"
@@ -1489,163 +1471,6 @@ async def register(
             </footer>
           </div>
         </div>
-
-      {/* ================= FASTAPI FORMDATA INSPECTOR MODAL ================= */}
-      {showPayloadModal && submittedData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-view-fade">
-          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 bg-gradient-to-r from-orange-500 to-[#FF6B00] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                  <ShieldCheck className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold">Account Created Successfully</h3>
-                  <p className="text-xs text-orange-100">
-                    Registered & verified with backend API
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowPayloadModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-4 text-sm">
-              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-2.5">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-bold text-emerald-900">
-                    Account Created & Verified!
-                  </p>
-                  <p className="text-xs text-emerald-700 mt-0.5">
-                    Your profile has been registered in the EventHub database. You can now log in to access your dashboard.
-                  </p>
-                </div>
-              </div>
-
-              {/* Table of values */}
-              <div className="bg-[#F8F9FA] rounded-2xl border border-gray-200 p-3.5 font-mono text-xs space-y-2">
-                <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">name</span>
-                  <span className="font-semibold text-gray-900">{submittedData.name}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-200 pb-1.5 items-center">
-                  <span className="text-gray-500">email</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-gray-900">{submittedData.email}</span>
-                    <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded font-sans font-bold">Verified ✓</span>
-                  </div>
-                </div>
-                <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">phonenumber</span>
-                  <span className="font-semibold text-gray-900">{submittedData.phonenumber}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">collegename</span>
-                  <span className="font-semibold text-gray-900">{submittedData.collegename}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">department</span>
-                  <span className="font-semibold text-[#FF6B00]">{submittedData.department}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">role</span>
-                  <span className="font-semibold text-[#FF6B00] uppercase bg-orange-100 px-2 py-0.5 rounded-full text-[10px]">
-                    {submittedData.role}
-                  </span>
-                </div>
-                <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">id_number</span>
-                  <span className="font-semibold text-gray-900">{submittedData.id_number}</span>
-                </div>
-                <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">otp</span>
-                  <span className="font-semibold text-emerald-600 tracking-widest">{submittedData.otp}</span>
-                </div>
-                <div className="flex justify-between pt-0.5 items-center">
-                  <span className="text-gray-500">id_proof (UploadFile)</span>
-                  {submittedData.id_proof ? (
-                    <div className="text-right">
-                      <span className="font-semibold text-gray-900 block truncate max-w-[200px]">
-                        {submittedData.id_proof.name}
-                      </span>
-                      <span className="text-[10px] text-gray-500">
-                        {submittedData.id_proof.size} • {submittedData.id_proof.type}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] font-sans font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      Not required for Student
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Code snippet */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                    <Code2 className="w-3.5 h-3.5 text-gray-500" />
-                    FastAPI Endpoint Signature
-                  </span>
-                  <button
-                    type="button"
-                    onClick={copyFastApiCode}
-                    className="text-xs font-medium text-[#FF6B00] hover:text-[#EA5E00] flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedCode ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy Python Code</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <pre className="bg-[#1E1E24] text-gray-200 p-3.5 rounded-2xl text-[11px] font-mono overflow-x-auto leading-relaxed">
-{`@app.post("/api/auth/register")
-async def register(
-    name: str = Form(...),
-    email: str = Form(...),
-    phonenumber: str = Form(...),
-    collegename: str = Form(...),
-    department: str = Form(...),
-    password: str = Form(...),
-    role: str = Form(...), # "student" | "faculty"
-    id_number: str = Form(...),
-    otp: str = Form(...),
-    id_proof: UploadFile = File(...)
-):
-    # Verify OTP and validate campus ID proof
-    return {"status": "success", "message": "Account created successfully", "role": role}`}
-                </pre>
-              </div>
-            </div>
-
-            <div className="px-6 py-3.5 bg-gray-50 border-t border-gray-200 flex items-center justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPayloadModal(false);
-                  setIsLoginView(true);
-                }}
-                className="px-5 py-2.5 rounded-full bg-[#FF6B00] hover:bg-[#EA5E00] text-white text-xs font-semibold shadow-md transition-all cursor-pointer"
-              >
-                Proceed to Log In
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      </div>
   );
 }

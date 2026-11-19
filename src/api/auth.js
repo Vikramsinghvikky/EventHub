@@ -1,6 +1,6 @@
 /**
  * EventHub Authentication API Service
- * Connects frontend React components to Express Backend API (/api/v1/users)
+ * Connects frontend React components directly to Express Backend API (/api/v1/users)
  */
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1/users';
@@ -29,22 +29,66 @@ async function handleResponse(response) {
 }
 
 /**
- * Send 6-digit verification OTP to the user's email
+ * Safe fetch wrapper that surfaces connection errors clearly if backend is offline
+ */
+async function safeFetch(url, options) {
+  try {
+    const response = await fetch(url, options);
+    return await handleResponse(response);
+  } catch (error) {
+    // If it's already an ApiError with statusCode from handleResponse, rethrow it
+    if (error.statusCode) {
+      throw error;
+    }
+    // Check for network connection failure / offline backend
+    if (
+      error.name === 'TypeError' &&
+      (error.message.includes('fetch') ||
+        error.message.includes('NetworkError') ||
+        error.message.includes('Failed to fetch'))
+    ) {
+      throw new Error(
+        'Backend server offline. Please start the Express backend by running "npm run dev" in the project root (http://localhost:8000).'
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Send 6-digit verification OTP to user's email via Express backend (/api/v1/users/send-otp)
  * @param {string} email
  */
 export async function sendOtp(email) {
-  const response = await fetch(`${BASE_URL}/send-otp`, {
+  return safeFetch(`${BASE_URL}/send-otp`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ email: email.trim().toLowerCase() }),
   });
-  return handleResponse(response);
 }
 
 /**
- * Register a new user
+ * Verify 6-digit OTP code against Redis session via Express backend (/api/v1/users/verify-otp)
+ * @param {string} email
+ * @param {string} otp
+ */
+export async function verifyOtp(email, otp) {
+  return safeFetch(`${BASE_URL}/verify-otp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+      otp: String(otp).trim(),
+    }),
+  });
+}
+
+/**
+ * Register a new user in MongoDB via Express backend (/api/v1/users/register)
  * @param {Object} userData - { name, email, phonenumber, collegename, department, password, role, otp }
  */
 export async function registerUser(userData) {
@@ -59,22 +103,22 @@ export async function registerUser(userData) {
     otp: String(userData.otp || '').trim(),
   };
 
-  const response = await fetch(`${BASE_URL}/register`, {
+  return safeFetch(`${BASE_URL}/register`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
   });
-  return handleResponse(response);
 }
 
 /**
- * Log in an existing user
+ * Log in an existing user via Express backend (/api/v1/users/login)
+ * Sets HTTP-only cookies and returns JWT tokens
  * @param {Object} credentials - { email, password }
  */
 export async function loginUser(credentials) {
-  const response = await fetch(`${BASE_URL}/login`, {
+  return safeFetch(`${BASE_URL}/login`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -85,27 +129,24 @@ export async function loginUser(credentials) {
       password: credentials.password,
     }),
   });
-  return handleResponse(response);
 }
 
 /**
- * Fetch current authenticated user session
+ * Fetch current authenticated user session (/api/v1/users/me)
  */
 export async function getCurrentUser() {
-  const response = await fetch(`${BASE_URL}/me`, {
+  return safeFetch(`${BASE_URL}/me`, {
     method: 'GET',
     credentials: 'include',
   });
-  return handleResponse(response);
 }
 
 /**
- * Log out user
+ * Log out user and clear auth cookies (/api/v1/users/logout)
  */
 export async function logoutUser() {
-  const response = await fetch(`${BASE_URL}/logout`, {
+  return safeFetch(`${BASE_URL}/logout`, {
     method: 'POST',
     credentials: 'include',
   });
-  return handleResponse(response);
 }
