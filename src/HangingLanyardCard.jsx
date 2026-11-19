@@ -144,7 +144,7 @@ export default function HangingLanyardCard({ scrollProgress = 0, isMobile = fals
             transform: isMobile
               ? `perspective(1000px) scale(${1 - scrollProgress * 0.14}) translateY(-${scrollProgress * 28}px) rotateX(${scrollProgress * 12}deg)`
               : undefined,
-            opacity: isMobile ? Math.max(1 - scrollProgress * 0.75, 0.25) : 1,
+            opacity: isMobile ? Math.max(1 - scrollProgress * 1.05, 0) : 1,
             filter: isMobile ? `blur(${scrollProgress * 2}px)` : undefined,
             transition: 'transform 0.18s ease-out, opacity 0.18s ease-out, filter 0.18s ease-out',
           }}

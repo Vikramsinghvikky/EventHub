@@ -70,7 +70,7 @@ export default function Auth({ previewMode = 'desktop' }) {
     setAutoScrollActive(false);
   };
 
-  // Smooth scroll trigger to login/create account section
+  // Smooth scroll trigger to login/create account section (100% full screen scroll)
   const triggerSmoothScroll = () => {
     if (!loginSectionRef.current) return;
 
@@ -78,7 +78,8 @@ export default function Auth({ previewMode = 'desktop' }) {
       scrollContainerRef.current &&
       scrollContainerRef.current.scrollHeight > scrollContainerRef.current.clientHeight + 20
     ) {
-      const targetTop = Math.max(loginSectionRef.current.offsetTop - 24, 0);
+      // 100% exact scroll to top of login section so zero orange or ID card peeks
+      const targetTop = loginSectionRef.current.offsetTop;
       scrollContainerRef.current.scrollTo({
         top: targetTop,
         behavior: 'smooth',
@@ -90,8 +91,8 @@ export default function Auth({ previewMode = 'desktop' }) {
 
   const handleScroll = (e) => {
     const scrollTop = e.currentTarget.scrollTop;
-    // Calculate smooth progress normalized between 0 and 1 over 160px scroll distance
-    const progress = Math.min(Math.max(scrollTop / 160, 0), 1);
+    // Calculate smooth progress normalized between 0 and 1 over 260px scroll distance
+    const progress = Math.min(Math.max(scrollTop / 260, 0), 1);
     setScrollProgress(progress);
 
     // If user manually scrolls during countdown, immediately cancel auto-scroll
@@ -442,15 +443,14 @@ export default function Auth({ previewMode = 'desktop' }) {
       errors.role = 'Please select your role (Student or Faculty)';
     }
 
-    if (!idNumber.trim()) {
-      errors.idNumber =
-        role === 'faculty'
-          ? 'Faculty Employee ID is required'
-          : 'Student ID / Roll Number is required';
-    }
-
-    if (!idProofFile) {
-      errors.idProof = `Valid ${role === 'faculty' ? 'Faculty' : 'Student'} ID proof is required`;
+    // Role-specific validation: Faculty requires employee ID & proof; Student does NOT
+    if (role === 'faculty') {
+      if (!idNumber.trim()) {
+        errors.idNumber = 'Faculty Employee ID is required';
+      }
+      if (!idProofFile) {
+        errors.idProof = 'Valid Faculty ID proof is required';
+      }
     }
 
     if (Object.keys(errors).length > 0) {
@@ -469,9 +469,12 @@ export default function Auth({ previewMode = 'desktop' }) {
     formData.append('department', deptValue);
     formData.append('password', registerPassword);
     formData.append('role', role);
-    formData.append('id_number', idNumber.trim());
     formData.append('otp', otpDigits.join('') || '123456');
-    formData.append('id_proof', idProofFile);
+
+    if (role === 'faculty') {
+      formData.append('id_number', idNumber.trim());
+      formData.append('id_proof', idProofFile);
+    }
 
     setTimeout(() => {
       setRegisterLoading(false);
@@ -483,13 +486,20 @@ export default function Auth({ previewMode = 'desktop' }) {
         department: deptValue,
         password: '••••••••••••',
         role: role,
-        id_number: idNumber.trim(),
         otp: otpDigits.join('') || '123456',
-        id_proof: {
-          name: idProofFile.name,
-          size: (idProofFile.size / 1024).toFixed(1) + ' KB',
-          type: idProofFile.type || 'application/octet-stream',
-        },
+        ...(role === 'faculty' && idProofFile
+          ? {
+              id_number: idNumber.trim(),
+              id_proof: {
+                name: idProofFile.name,
+                size: (idProofFile.size / 1024).toFixed(1) + ' KB',
+                type: idProofFile.type || 'application/octet-stream',
+              },
+            }
+          : {
+              id_number: 'N/A (Student Direct Access)',
+              id_proof: null,
+            }),
         timestamp: new Date().toLocaleTimeString(),
       });
       setShowPayloadModal(true);
@@ -506,16 +516,20 @@ async def register(
     department: str = Form(...),
     password: str = Form(...),
     role: str = Form(...), # "student" | "faculty"
-    id_number: str = Form(...),
     otp: str = Form(...),
-    id_proof: UploadFile = File(...)
+    id_number: Optional[str] = Form(None), # Required for faculty
+    id_proof: Optional[UploadFile] = File(None) # Required for faculty
 ):
     # 1. Verify 6-digit email OTP
     is_valid_otp = await auth_service.verify_otp(email=email, otp=otp)
     if not is_valid_otp:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
     
-    # 2. Validate institutional ID proof & create verified EventHub account
+    # 2. Require ID proof only for faculty
+    if role == "faculty" and (not id_number or not id_proof):
+        raise HTTPException(status_code=400, detail="Faculty Employee ID and proof are required")
+    
+    # 3. Create verified EventHub account
     user = await auth_service.create_user(
         name=name,
         email=email,
@@ -529,7 +543,7 @@ async def register(
     )
     return {
         "status": "success",
-        "message": "EventHub account created and verified successfully",
+        "message": f"EventHub {role.title()} account created and verified successfully",
         "user_id": user.id
     }`;
     navigator.clipboard.writeText(code);
@@ -552,7 +566,7 @@ async def register(
         onWheel={handleUserInteraction}
         className={`w-full bg-white rounded-[32px] sm:rounded-[36px] shadow-2xl border border-gray-200/90 overflow-hidden transition-all duration-500 ease-in-out ${
           isMobileLayout
-            ? 'max-w-[400px] max-h-[85vh] overflow-y-auto scroll-smooth'
+            ? 'max-w-[400px] h-[640px] max-h-[88vh] overflow-y-auto scroll-smooth'
             : previewMode === 'tablet'
             ? 'max-w-[768px]'
             : 'max-w-[1040px]'
@@ -566,13 +580,13 @@ async def register(
           
           {/* ========================================================
               LEFT PANEL: REALISTIC HANGING LANYARD ID CARD SHOWCASE
-              - Mobile: Top hero banner with physics scroll parallax
+              - Mobile: 100% full-screen hero section (640px full height)
               - Desktop/Tablet: Dedicated Left Column
              ======================================================== */}
           <div
             className={`bg-gradient-to-b from-[#FF7A1A] via-[#FF6B00] to-[#E65100] relative px-4 pt-4 text-white overflow-hidden transition-all duration-500 ${
               isMobileLayout
-                ? 'pb-10 rounded-b-[32px] flex flex-col justify-between'
+                ? 'min-h-[640px] h-[640px] pb-6 flex flex-col justify-between flex-shrink-0'
                 : 'pb-6 sm:p-7 lg:p-8 rounded-b-[32px] md:rounded-b-none md:rounded-l-[32px] flex flex-col justify-between'
             }`}
           >
@@ -685,18 +699,38 @@ async def register(
 
           {/* ========================================================
               RIGHT PANEL: AUTHENTICATION FORM (Log In / Create Account)
-              - Mobile: Sleek Overlapping Bottom Sheet (-mt-7, rounded-t-[32px], relative z-20)
-                Glides upward with dynamic expanding shadow + crisp top border!
+              - Mobile: 100% full-screen pure white login screen (640px full height, zero orange leftover at top)
               - Desktop/Tablet: Dedicated Right Column
              ======================================================== */}
           <div
             ref={loginSectionRef}
-            className={`bg-[#F8F9FA] p-6 sm:p-8 lg:p-10 flex flex-col justify-center overflow-y-auto transition-all duration-350 ease-out ${
+            className={`bg-white p-6 sm:p-8 lg:p-10 flex flex-col justify-start overflow-y-auto transition-all duration-350 ease-out ${
               isMobileLayout
-                ? 'rounded-t-[32px] -mt-7 relative z-20 border-t border-white/80 shadow-[0_-16px_40px_rgba(255,107,0,0.16)] min-h-[560px]'
-                : ''
+                ? 'min-h-[640px] w-full relative z-20 flex-shrink-0'
+                : 'bg-[#F8F9FA] justify-center'
             }`}
           >
+            {/* Mobile View Top Navigation Bar: View EventHub Pass */}
+            {isMobileLayout && (
+              <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-gray-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF7ED] hover:bg-[#FFEDD5] text-[#FF6B00] text-xs font-bold transition-all shadow-xs cursor-pointer group"
+                  title="Scroll back up to view 3D EventHub Lanyard Pass"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform stroke-[2.5]" />
+                  <span>View EventHub Pass</span>
+                </button>
+
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>{isLoginView ? 'Secure Log in' : 'Campus Sign up'}</span>
+                </div>
+              </div>
+            )}
             {isLoginView ? (
               /* ================= VIEW 1: LOG IN VIEW ================= */
               <div className="animate-view-fade w-full max-w-md mx-auto">
@@ -1330,7 +1364,7 @@ async def register(
                         </div>
                         <div>
                           <div className="text-xs font-bold text-gray-900">Student</div>
-                          <div className="text-[10px] text-[#6B7280]">Campus pass & fests</div>
+                          <div className="text-[10px] text-[#6B7280]">Instant pass • No ID upload</div>
                         </div>
                       </button>
 
@@ -1342,8 +1376,6 @@ async def register(
                           setRegisterErrors((prev) => {
                             const copy = { ...prev };
                             delete copy.role;
-                            delete copy.idNumber;
-                            delete copy.idProof;
                             return copy;
                           });
                         }}
@@ -1371,134 +1403,165 @@ async def register(
                         </div>
                         <div>
                           <div className="text-xs font-bold text-gray-900">Faculty</div>
-                          <div className="text-[10px] text-[#6B7280]">Host & verify events</div>
+                          <div className="text-[10px] text-[#6B7280]">Requires Faculty ID upload</div>
                         </div>
                       </button>
                     </div>
                   </div>
 
-                  {/* Conditional Valid ID Proof Section */}
-                  <div className="p-3.5 rounded-2xl bg-white border border-[#E5E7EB] space-y-3 shadow-sm">
-                    {/* ID Input */}
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-800 mb-1">
-                        {role === 'faculty' ? 'Faculty Employee ID' : 'Student ID / Roll Number'}
-                      </label>
-                      <input
-                        type="text"
-                        value={idNumber}
-                        onChange={(e) => setIdNumber(e.target.value)}
-                        placeholder={role === 'faculty' ? 'e.g., FAC-2026-089' : 'e.g., 1RV24AI045'}
-                        className={`w-full h-10 px-3.5 rounded-xl text-sm bg-gray-50/70 border ${
-                          registerErrors.idNumber
-                            ? 'border-red-500 focus:ring-red-200'
-                            : 'border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
-                        } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all`}
-                      />
-                      {registerErrors.idNumber && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          {registerErrors.idNumber}
+                  {/* Student Mode: Instant Pass Benefit Notice (NO ID Upload or Box) */}
+                  {role === 'student' && (
+                    <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200/90 flex items-center gap-2.5 animate-view-fade">
+                      <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-emerald-900">
+                          Direct Student Access Activated
                         </p>
-                      )}
+                        <p className="text-[11px] text-emerald-700 leading-tight mt-0.5">
+                          No ID card upload needed! Your verified college email unlocks instant campus passes, fests, and event registrations.
+                        </p>
+                      </div>
                     </div>
+                  )}
 
-                    {/* ID Proof Dropzone */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-semibold text-gray-800">
-                          {role === 'faculty' ? 'Upload Valid Faculty ID Proof' : 'Upload Valid Student ID Proof'}
-                        </label>
-                        <span className="text-[10px] text-gray-400">JPG, PNG, PDF</span>
+                  {/* Faculty Mode: Requires Faculty Employee ID & ID Card Upload Dropzone */}
+                  {role === 'faculty' && (
+                    <div className="p-3.5 rounded-2xl bg-orange-50/40 border border-orange-200/80 space-y-3 shadow-xs animate-view-fade">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#FF6B00]">
+                        <Briefcase className="w-3.5 h-3.5" />
+                        <span>Faculty Verification Credentials</span>
                       </div>
 
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept=".jpg,.jpeg,.png,.pdf"
-                        className="hidden"
-                      />
+                      {/* Faculty Employee ID */}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-800 mb-1">
+                          Faculty Employee ID
+                        </label>
+                        <input
+                          type="text"
+                          value={idNumber}
+                          onChange={(e) => {
+                            setIdNumber(e.target.value);
+                            if (registerErrors.idNumber) {
+                              setRegisterErrors((prev) => {
+                                const c = { ...prev };
+                                delete c.idNumber;
+                                return c;
+                              });
+                            }
+                          }}
+                          placeholder="e.g., FAC-2026-089"
+                          className={`w-full h-10 px-3.5 rounded-xl text-sm bg-white border ${
+                            registerErrors.idNumber
+                              ? 'border-red-500 focus:ring-red-200'
+                              : 'border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
+                          } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all shadow-xs`}
+                        />
+                        {registerErrors.idNumber && (
+                          <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {registerErrors.idNumber}
+                          </p>
+                        )}
+                      </div>
 
-                      {!idProofFile ? (
-                        <div
-                          onClick={() => fileInputRef.current?.click()}
-                          onDragOver={handleDragOver}
-                          onDrop={handleDrop}
-                          className={`w-full border-2 border-dashed ${
-                            registerErrors.idProof
-                              ? 'border-red-400 bg-red-50/20'
-                              : 'border-gray-300 hover:border-[#FF6B00] bg-gray-50/60 hover:bg-orange-50/20'
-                          } rounded-xl p-3.5 flex flex-col items-center justify-center cursor-pointer transition-all group`}
-                        >
-                          <div className="w-8 h-8 rounded-full bg-[#FFF7ED] group-hover:bg-[#FFEDD5] flex items-center justify-center text-[#FF6B00] mb-1.5 transition-colors">
-                            <UploadCloud className="w-4 h-4 stroke-[2.2]" />
-                          </div>
-                          <span className="text-xs font-semibold text-gray-700 group-hover:text-[#FF6B00] text-center">
-                            {role === 'faculty'
-                              ? 'Upload Faculty ID Card (JPG, PNG, PDF)'
-                              : 'Upload College ID Card (JPG, PNG, PDF)'}
-                          </span>
-                          <span className="text-[10px] text-gray-400 mt-0.5">
-                            Drag & drop or click to choose file
-                          </span>
+                      {/* Faculty ID Proof Dropzone */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-gray-800">
+                            Upload Valid Faculty ID Proof
+                          </label>
+                          <span className="text-[10px] text-gray-400 font-medium">JPG, PNG, PDF</span>
                         </div>
-                      ) : (
-                        <div className="w-full bg-orange-50/50 border border-[#FED7AA] rounded-xl p-2.5 flex items-center justify-between">
-                          <div className="flex items-center gap-2.5 overflow-hidden">
-                            {idProofPreview ? (
-                              <img
-                                src={idProofPreview}
-                                alt="ID Preview"
-                                className="w-10 h-10 object-cover rounded-lg border border-gray-200"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-[#FF6B00] flex-shrink-0">
-                                <FileText className="w-5 h-5" />
-                              </div>
-                            )}
-                            <div className="overflow-hidden">
-                              <div className="text-xs font-semibold text-gray-900 truncate">
-                                {idProofFile.name}
-                              </div>
-                              <div className="text-[10px] text-gray-500 flex items-center gap-1">
-                                <span>{(idProofFile.size / 1024).toFixed(0)} KB</span>
-                                <span>•</span>
-                                <span className="text-emerald-600 font-medium flex items-center gap-0.5">
-                                  <CheckCircle2 className="w-3.5 h-3.5" /> Ready
-                                </span>
+
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileChange}
+                          accept=".jpg,.jpeg,.png,.pdf"
+                          className="hidden"
+                        />
+
+                        {!idProofFile ? (
+                          <div
+                            onClick={() => fileInputRef.current?.click()}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            className={`w-full border-2 border-dashed ${
+                              registerErrors.idProof
+                                ? 'border-red-400 bg-red-50/20'
+                                : 'border-gray-300 hover:border-[#FF6B00] bg-white hover:bg-orange-50/20'
+                            } rounded-xl p-3.5 flex flex-col items-center justify-center cursor-pointer transition-all group`}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-[#FFF7ED] group-hover:bg-[#FFEDD5] flex items-center justify-center text-[#FF6B00] mb-1.5 transition-colors">
+                              <UploadCloud className="w-4 h-4 stroke-[2.2]" />
+                            </div>
+                            <span className="text-xs font-semibold text-gray-700 group-hover:text-[#FF6B00] text-center">
+                              Upload Faculty ID Card (JPG, PNG, PDF)
+                            </span>
+                            <span className="text-[10px] text-gray-400 mt-0.5">
+                              Drag & drop or click to choose file
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="w-full bg-white border border-[#FED7AA] rounded-xl p-2.5 flex items-center justify-between shadow-xs">
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              {idProofPreview ? (
+                                <img
+                                  src={idProofPreview}
+                                  alt="ID Preview"
+                                  className="w-10 h-10 object-cover rounded-lg border border-gray-200"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-[#FF6B00] flex-shrink-0">
+                                  <FileText className="w-5 h-5" />
+                                </div>
+                              )}
+                              <div className="overflow-hidden">
+                                <div className="text-xs font-semibold text-gray-900 truncate">
+                                  {idProofFile.name}
+                                </div>
+                                <div className="text-[10px] text-gray-500 flex items-center gap-1">
+                                  <span>{(idProofFile.size / 1024).toFixed(0)} KB</span>
+                                  <span>•</span>
+                                  <span className="text-emerald-600 font-medium flex items-center gap-0.5">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => fileInputRef.current?.click()}
-                              className="px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 rounded cursor-pointer"
-                            >
-                              Change
-                            </button>
-                            <button
-                              type="button"
-                              onClick={removeFile}
-                              className="p-1 text-gray-400 hover:text-red-500 rounded cursor-pointer"
-                              aria-label="Remove file"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-2 py-1 text-[11px] font-medium text-gray-600 hover:text-gray-900 rounded cursor-pointer"
+                              >
+                                Change
+                              </button>
+                              <button
+                                type="button"
+                                onClick={removeFile}
+                                className="p-1 text-gray-400 hover:text-red-500 rounded cursor-pointer"
+                                aria-label="Remove file"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {registerErrors.idProof && (
-                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          {registerErrors.idProof}
-                        </p>
-                      )}
+                        {registerErrors.idProof && (
+                          <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {registerErrors.idProof}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Primary Orange Pill Button: "Create Account" */}
                   <button
@@ -1616,14 +1679,20 @@ async def register(
                 </div>
                 <div className="flex justify-between pt-0.5 items-center">
                   <span className="text-gray-500">id_proof (UploadFile)</span>
-                  <div className="text-right">
-                    <span className="font-semibold text-gray-900 block truncate max-w-[200px]">
-                      {submittedData.id_proof.name}
+                  {submittedData.id_proof ? (
+                    <div className="text-right">
+                      <span className="font-semibold text-gray-900 block truncate max-w-[200px]">
+                        {submittedData.id_proof.name}
+                      </span>
+                      <span className="text-[10px] text-gray-500">
+                        {submittedData.id_proof.size} • {submittedData.id_proof.type}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] font-sans font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Not required (Student Direct Pass)
                     </span>
-                    <span className="text-[10px] text-gray-500">
-                      {submittedData.id_proof.size} • {submittedData.id_proof.type}
-                    </span>
-                  </div>
+                  )}
                 </div>
               </div>
 
