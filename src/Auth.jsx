@@ -19,7 +19,11 @@ import {
   ShieldCheck,
   Ticket,
   Bot,
-  ChevronDown
+  ChevronDown,
+  Phone,
+  Building2,
+  KeyRound,
+  RefreshCw
 } from 'lucide-react';
 
 export default function Auth({ previewMode = 'desktop' }) {
@@ -155,6 +159,18 @@ export default function Auth({ previewMode = 'desktop' }) {
   // --- CREATE ACCOUNT FORM STATES ---
   const [fullName, setFullName] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [otpTimer, setOtpTimer] = useState(30);
+  const [canResendOtp, setCanResendOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [collegeName, setCollegeName] = useState('');
+  const [department, setDepartment] = useState('AIML');
+  const [customDepartment, setCustomDepartment] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [role, setRole] = useState('student'); // 'student' | 'faculty'
@@ -164,12 +180,139 @@ export default function Auth({ previewMode = 'desktop' }) {
   const [registerErrors, setRegisterErrors] = useState({});
   const [registerLoading, setRegisterLoading] = useState(false);
 
+  // OTP Input refs & timer ref
+  const otpRefs = useRef([]);
+  const otpTimerRef = useRef(null);
+
   // --- FASTAPI FORMDATA MODAL STATE ---
   const [showPayloadModal, setShowPayloadModal] = useState(false);
   const [submittedData, setSubmittedData] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
   const fileInputRef = useRef(null);
+
+  // Clean up OTP timer on unmount
+  useEffect(() => {
+    return () => {
+      if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+    };
+  }, []);
+
+  // OTP HANDLERS
+  const startOtpCountdown = () => {
+    setOtpTimer(30);
+    setCanResendOtp(false);
+    if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+    otpTimerRef.current = setInterval(() => {
+      setOtpTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(otpTimerRef.current);
+          setCanResendOtp(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleSendOtp = () => {
+    if (!registerEmail.trim()) {
+      setRegisterErrors((prev) => ({
+        ...prev,
+        email: 'Please enter your college email first',
+      }));
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerEmail.trim())) {
+      setRegisterErrors((prev) => ({
+        ...prev,
+        email: 'Please enter a valid email address (e.g., student@jnnce.ac.in)',
+      }));
+      return;
+    }
+
+    setRegisterErrors((prev) => {
+      const copy = { ...prev };
+      delete copy.email;
+      return copy;
+    });
+
+    setOtpDigits(['', '', '', '', '', '']);
+    setOtpError('');
+    setIsOtpSent(true);
+    startOtpCountdown();
+
+    setTimeout(() => {
+      otpRefs.current[0]?.focus();
+    }, 100);
+  };
+
+  const handleOtpChange = (index, value) => {
+    const char = value.replace(/\D/g, '').slice(-1);
+    const newDigits = [...otpDigits];
+    newDigits[index] = char;
+    setOtpDigits(newDigits);
+    setOtpError('');
+
+    if (char && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace') {
+      if (!otpDigits[index] && index > 0) {
+        otpRefs.current[index - 1]?.focus();
+      }
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    if (pasted) {
+      const newDigits = [...otpDigits];
+      for (let i = 0; i < 6; i++) {
+        newDigits[i] = pasted[i] || '';
+      }
+      setOtpDigits(newDigits);
+      setOtpError('');
+      const nextIdx = Math.min(pasted.length, 5);
+      otpRefs.current[nextIdx]?.focus();
+    }
+  };
+
+  const handleVerifyOtp = () => {
+    const code = otpDigits.join('');
+    if (code.length < 6) {
+      setOtpError('Please enter all 6 digits of the OTP code');
+      return;
+    }
+
+    setOtpLoading(true);
+    setOtpError('');
+
+    setTimeout(() => {
+      setOtpLoading(false);
+      setIsEmailVerified(true);
+      setIsOtpSent(false);
+      if (otpTimerRef.current) clearInterval(otpTimerRef.current);
+      setRegisterErrors((prev) => {
+        const copy = { ...prev };
+        delete copy.email;
+        delete copy.otp;
+        return copy;
+      });
+    }, 600);
+  };
+
+  const handleResendOtp = () => {
+    if (!canResendOtp) return;
+    setOtpDigits(['', '', '', '', '', '']);
+    setOtpError('');
+    startOtpCountdown();
+    otpRefs.current[0]?.focus();
+  };
 
   // File Upload Handlers
   const handleFileChange = (e) => {
@@ -263,13 +406,30 @@ export default function Auth({ previewMode = 'desktop' }) {
     const errors = {};
 
     if (!fullName.trim()) {
-      errors.fullName = 'Full name is required';
+      errors.fullName = 'Full Name is required';
     }
 
     if (!registerEmail.trim()) {
-      errors.email = 'College email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerEmail)) {
+      errors.email = 'Institutional / College email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(registerEmail.trim())) {
       errors.email = 'Please enter a valid college email address';
+    } else if (!isEmailVerified) {
+      errors.email = 'Please verify your college email with the 6-digit OTP';
+    }
+
+    if (!phoneNumber.trim()) {
+      errors.phoneNumber = 'Phone number is required';
+    } else if (!/^[+]?[0-9\s-]{10,14}$/.test(phoneNumber.trim())) {
+      errors.phoneNumber = 'Please enter a valid phone number (e.g., +919845012345)';
+    }
+
+    if (!collegeName.trim()) {
+      errors.collegeName = 'College name is required';
+    }
+
+    const deptValue = department === 'OTHER' ? customDepartment.trim() : department;
+    if (!deptValue) {
+      errors.department = 'Department is required';
     }
 
     if (!registerPassword) {
@@ -302,21 +462,29 @@ export default function Auth({ previewMode = 'desktop' }) {
     setRegisterLoading(true);
 
     const formData = new FormData();
-    formData.append('full_name', fullName.trim());
+    formData.append('name', fullName.trim());
     formData.append('email', registerEmail.trim());
+    formData.append('phonenumber', phoneNumber.trim());
+    formData.append('collegename', collegeName.trim());
+    formData.append('department', deptValue);
     formData.append('password', registerPassword);
     formData.append('role', role);
     formData.append('id_number', idNumber.trim());
+    formData.append('otp', otpDigits.join('') || '123456');
     formData.append('id_proof', idProofFile);
 
     setTimeout(() => {
       setRegisterLoading(false);
       setSubmittedData({
-        full_name: fullName.trim(),
+        name: fullName.trim(),
         email: registerEmail.trim(),
+        phonenumber: phoneNumber.trim(),
+        collegename: collegeName.trim(),
+        department: deptValue,
         password: '••••••••••••',
         role: role,
         id_number: idNumber.trim(),
+        otp: otpDigits.join('') || '123456',
         id_proof: {
           name: idProofFile.name,
           size: (idProofFile.size / 1024).toFixed(1) + ' KB',
@@ -331,23 +499,39 @@ export default function Auth({ previewMode = 'desktop' }) {
   const copyFastApiCode = () => {
     const code = `@app.post("/api/auth/register")
 async def register(
-    full_name: str = Form(...),
+    name: str = Form(...),
     email: str = Form(...),
+    phonenumber: str = Form(...),
+    collegename: str = Form(...),
+    department: str = Form(...),
     password: str = Form(...),
     role: str = Form(...), # "student" | "faculty"
     id_number: str = Form(...),
+    otp: str = Form(...),
     id_proof: UploadFile = File(...)
 ):
-    # Verify campus ID proof & create verified EventHub account
+    # 1. Verify 6-digit email OTP
+    is_valid_otp = await auth_service.verify_otp(email=email, otp=otp)
+    if not is_valid_otp:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+    
+    # 2. Validate institutional ID proof & create verified EventHub account
     user = await auth_service.create_user(
-        name=full_name,
+        name=name,
         email=email,
+        phone=phonenumber,
+        college=collegename,
+        department=department,
         password=password,
         role=role,
         id_number=id_number,
         id_proof=id_proof
     )
-    return {"status": "success", "user_id": user.id}`;
+    return {
+        "status": "success",
+        "message": "EventHub account created and verified successfully",
+        "user_id": user.id
+    }`;
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
@@ -741,7 +925,7 @@ async def register(
                 </div>
 
                 <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-                  {/* Full Name */}
+                  {/* 1. Full Name */}
                   <div>
                     <label className="block text-xs font-semibold text-[#4B5563] mb-1">
                       Full Name
@@ -749,8 +933,17 @@ async def register(
                     <input
                       type="text"
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      placeholder="Enter your full name"
+                      onChange={(e) => {
+                        setFullName(e.target.value);
+                        if (registerErrors.fullName) {
+                          setRegisterErrors((prev) => {
+                            const c = { ...prev };
+                            delete c.fullName;
+                            return c;
+                          });
+                        }
+                      }}
+                      placeholder="e.g., Arjun Kumar"
                       className={`w-full h-11 px-3.5 rounded-xl text-sm bg-white border ${
                         registerErrors.fullName
                           ? 'border-red-500 focus:ring-red-200'
@@ -765,61 +958,329 @@ async def register(
                     )}
                   </div>
 
-                  {/* College Email */}
+                  {/* 2. Institutional / College Email + Inline Verify Button & 6-Digit OTP Box */}
                   <div>
-                    <label className="block text-xs font-semibold text-[#4B5563] mb-1">
-                      College Email
-                    </label>
-                    <input
-                      type="email"
-                      value={registerEmail}
-                      onChange={(e) => setRegisterEmail(e.target.value)}
-                      placeholder="Your college email"
-                      className={`w-full h-11 px-3.5 rounded-xl text-sm bg-white border ${
-                        registerErrors.email
-                          ? 'border-red-500 focus:ring-red-200'
-                          : 'border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
-                      } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all shadow-sm`}
-                    />
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-semibold text-[#4B5563]">
+                        Institutional / College Email
+                      </label>
+                      {isEmailVerified && (
+                        <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Verified ✓
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type="email"
+                        disabled={isEmailVerified}
+                        value={registerEmail}
+                        onChange={(e) => {
+                          setRegisterEmail(e.target.value);
+                          if (registerErrors.email) {
+                            setRegisterErrors((prev) => {
+                              const c = { ...prev };
+                              delete c.email;
+                              return c;
+                            });
+                          }
+                        }}
+                        placeholder="e.g., student@jnnce.ac.in"
+                        className={`w-full h-11 pl-3.5 pr-24 rounded-xl text-sm ${
+                          isEmailVerified
+                            ? 'bg-emerald-50/50 border-emerald-300 text-gray-800'
+                            : 'bg-white border-[#E5E7EB]'
+                        } border ${
+                          registerErrors.email
+                            ? 'border-red-500 focus:ring-red-200'
+                            : 'focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
+                        } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all shadow-sm`}
+                      />
+
+                      {/* Right-Side Inline Action Button */}
+                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {isEmailVerified ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsEmailVerified(false);
+                              setIsOtpSent(false);
+                              setOtpDigits(['', '', '', '', '', '']);
+                            }}
+                            className="text-[11px] text-gray-400 hover:text-[#FF6B00] font-medium px-2 py-1 hover:underline cursor-pointer"
+                            title="Change email address"
+                          >
+                            Change
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleSendOtp}
+                            className="px-3 py-1.5 rounded-lg bg-[#FF6B00] hover:bg-[#EA5E00] active:scale-95 text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1"
+                          >
+                            <span>{isOtpSent ? 'Resend' : 'Verify'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     {registerErrors.email && (
                       <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
                         <AlertCircle className="w-3.5 h-3.5" />
                         {registerErrors.email}
                       </p>
                     )}
+
+                    {/* Inline 6-Digit OTP Verification Box */}
+                    {isOtpSent && !isEmailVerified && (
+                      <div className="mt-2.5 p-3 sm:p-3.5 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] space-y-2.5 animate-view-fade shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-[#C2410C]">
+                            <KeyRound className="w-3.5 h-3.5 text-[#FF6B00]" />
+                            <span>6-Digit Email Verification Code</span>
+                          </div>
+                          <span className="text-[10px] font-semibold text-orange-700 bg-white px-2 py-0.5 rounded-full border border-orange-200">
+                            Demo OTP: 123456
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-gray-600 leading-tight">
+                          Enter the 6-digit code sent to <span className="font-semibold text-gray-900">{registerEmail}</span>
+                        </p>
+
+                        {/* 6 Auto-Advancing Input Boxes */}
+                        <div className="flex items-center justify-between gap-1.5 max-w-[280px] mx-auto py-1">
+                          {otpDigits.map((digit, idx) => (
+                            <input
+                              key={idx}
+                              ref={(el) => (otpRefs.current[idx] = el)}
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              maxLength={1}
+                              value={digit}
+                              onChange={(e) => handleOtpChange(idx, e.target.value)}
+                              onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                              onPaste={handleOtpPaste}
+                              className={`w-9 sm:w-10 h-10 sm:h-11 text-center text-base font-bold font-mono rounded-xl bg-white border ${
+                                digit ? 'border-[#FF6B00] ring-1 ring-[#FF6B00]/40 text-[#FF6B00]' : 'border-gray-300 text-gray-900'
+                              } focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/30 focus:outline-none shadow-xs transition-all`}
+                            />
+                          ))}
+                        </div>
+
+                        {otpError && (
+                          <p className="text-red-500 text-xs flex items-center justify-center gap-1 font-medium">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            {otpError}
+                          </p>
+                        )}
+
+                        {/* Confirm OTP & Resend Countdown Row */}
+                        <div className="flex items-center justify-between pt-1 border-t border-orange-200/70">
+                          {canResendOtp ? (
+                            <button
+                              type="button"
+                              onClick={handleResendOtp}
+                              className="text-xs font-bold text-[#FF6B00] hover:text-[#EA5E00] hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              <span>Resend OTP</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-gray-500 font-medium">
+                              Resend OTP in <span className="font-bold text-[#FF6B00] font-mono">{otpTimer}s</span>
+                            </span>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleVerifyOtp}
+                            disabled={otpLoading || otpDigits.join('').length < 6}
+                            className="px-3.5 py-1.5 rounded-xl bg-[#FF6B00] hover:bg-[#EA5E00] active:scale-95 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                          >
+                            {otpLoading ? (
+                              <>
+                                <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin"></div>
+                                <span>Verifying...</span>
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Confirm OTP</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Password */}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#4B5563] mb-1">
-                      Password
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showRegisterPassword ? 'text' : 'password'}
-                        value={registerPassword}
-                        onChange={(e) => setRegisterPassword(e.target.value)}
-                        placeholder="Create a password"
-                        className={`w-full h-11 pl-3.5 pr-11 rounded-xl text-sm bg-white border ${
-                          registerErrors.password
-                            ? 'border-red-500 focus:ring-red-200'
-                            : 'border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
-                        } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all shadow-sm`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
-                      >
-                        {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
+                  {/* 3 & 4. Phone Number & College Name (2-Column Grid on tablet/desktop) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Phone Number */}
+                    <div>
+                      <label className="block text-xs font-semibold text-[#4B5563] mb-1">
+                        Phone Number
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="tel"
+                          value={phoneNumber}
+                          onChange={(e) => {
+                            setPhoneNumber(e.target.value);
+                            if (registerErrors.phoneNumber) {
+                              setRegisterErrors((prev) => {
+                                const c = { ...prev };
+                                delete c.phoneNumber;
+                                return c;
+                              });
+                            }
+                          }}
+                          placeholder="e.g., +919845012345"
+                          className={`w-full h-11 pl-9 pr-3 rounded-xl text-sm bg-white border ${
+                            registerErrors.phoneNumber
+                              ? 'border-red-500 focus:ring-red-200'
+                              : 'border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
+                          } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all shadow-sm`}
+                        />
+                        <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                      {registerErrors.phoneNumber && (
+                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {registerErrors.phoneNumber}
+                        </p>
+                      )}
                     </div>
-                    {registerErrors.password && (
-                      <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        {registerErrors.password}
-                      </p>
-                    )}
+
+                    {/* College Name */}
+                    <div>
+                      <label className="block text-xs font-semibold text-[#4B5563] mb-1">
+                        College Name
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={collegeName}
+                          onChange={(e) => {
+                            setCollegeName(e.target.value);
+                            if (registerErrors.collegeName) {
+                              setRegisterErrors((prev) => {
+                                const c = { ...prev };
+                                delete c.collegeName;
+                                return c;
+                              });
+                            }
+                          }}
+                          placeholder="e.g., JNNCE"
+                          className={`w-full h-11 pl-9 pr-3 rounded-xl text-sm bg-white border ${
+                            registerErrors.collegeName
+                              ? 'border-red-500 focus:ring-red-200'
+                              : 'border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
+                          } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all shadow-sm`}
+                        />
+                        <Building2 className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      </div>
+                      {registerErrors.collegeName && (
+                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {registerErrors.collegeName}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 5 & 6. Department & Password (2-Column Grid on tablet/desktop) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Department */}
+                    <div>
+                      <label className="block text-xs font-semibold text-[#4B5563] mb-1">
+                        Department
+                      </label>
+                      <select
+                        value={department}
+                        onChange={(e) => {
+                          setDepartment(e.target.value);
+                          if (registerErrors.department) {
+                            setRegisterErrors((prev) => {
+                              const c = { ...prev };
+                              delete c.department;
+                              return c;
+                            });
+                          }
+                        }}
+                        className="w-full h-11 px-3 rounded-xl text-sm bg-white border border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/25 text-gray-900 focus:outline-none transition-all shadow-sm cursor-pointer"
+                      >
+                        <option value="AIML">AIML - AI & Machine Learning</option>
+                        <option value="CSE">CSE - Computer Science & Engg</option>
+                        <option value="ISE">ISE - Information Science & Engg</option>
+                        <option value="ECE">ECE - Electronics & Comm Engg</option>
+                        <option value="EEE">EEE - Electrical & Electronics</option>
+                        <option value="MECH">MECH - Mechanical Engg</option>
+                        <option value="CIVIL">CIVIL - Civil Engg</option>
+                        <option value="OTHER">Other / Custom Department</option>
+                      </select>
+                      {department === 'OTHER' && (
+                        <input
+                          type="text"
+                          value={customDepartment}
+                          onChange={(e) => setCustomDepartment(e.target.value)}
+                          placeholder="Enter your department"
+                          className="w-full h-10 mt-1.5 px-3 rounded-xl text-sm bg-white border border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/25 text-gray-900 placeholder-gray-400 focus:outline-none transition-all shadow-sm"
+                        />
+                      )}
+                      {registerErrors.department && (
+                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {registerErrors.department}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Password */}
+                    <div>
+                      <label className="block text-xs font-semibold text-[#4B5563] mb-1">
+                        Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showRegisterPassword ? 'text' : 'password'}
+                          value={registerPassword}
+                          onChange={(e) => {
+                            setRegisterPassword(e.target.value);
+                            if (registerErrors.password) {
+                              setRegisterErrors((prev) => {
+                                const c = { ...prev };
+                                delete c.password;
+                                return c;
+                              });
+                            }
+                          }}
+                          placeholder="e.g., Password@123"
+                          className={`w-full h-11 pl-3.5 pr-11 rounded-xl text-sm bg-white border ${
+                            registerErrors.password
+                              ? 'border-red-500 focus:ring-red-200'
+                              : 'border-[#E5E7EB] focus:border-[#FF6B00] focus:ring-[#FF6B00]/25'
+                          } text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all shadow-sm`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none cursor-pointer"
+                        >
+                          {showRegisterPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {registerErrors.password && (
+                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {registerErrors.password}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Role Selector Cards (Student vs Faculty) */}
@@ -1115,14 +1576,29 @@ async def register(
               </div>
 
               {/* Table of values */}
-              <div className="bg-[#F8F9FA] rounded-2xl border border-gray-200 p-3 font-mono text-xs space-y-2">
+              <div className="bg-[#F8F9FA] rounded-2xl border border-gray-200 p-3.5 font-mono text-xs space-y-2">
                 <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">full_name</span>
-                  <span className="font-semibold text-gray-900">{submittedData.full_name}</span>
+                  <span className="text-gray-500">name</span>
+                  <span className="font-semibold text-gray-900">{submittedData.name}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-200 pb-1.5 items-center">
+                  <span className="text-gray-500">email</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-gray-900">{submittedData.email}</span>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded font-sans font-bold">Verified ✓</span>
+                  </div>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-1.5">
-                  <span className="text-gray-500">email</span>
-                  <span className="font-semibold text-gray-900">{submittedData.email}</span>
+                  <span className="text-gray-500">phonenumber</span>
+                  <span className="font-semibold text-gray-900">{submittedData.phonenumber}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                  <span className="text-gray-500">collegename</span>
+                  <span className="font-semibold text-gray-900">{submittedData.collegename}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                  <span className="text-gray-500">department</span>
+                  <span className="font-semibold text-[#FF6B00]">{submittedData.department}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-200 pb-1.5">
                   <span className="text-gray-500">role</span>
@@ -1133,6 +1609,10 @@ async def register(
                 <div className="flex justify-between border-b border-gray-200 pb-1.5">
                   <span className="text-gray-500">id_number</span>
                   <span className="font-semibold text-gray-900">{submittedData.id_number}</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                  <span className="text-gray-500">otp</span>
+                  <span className="font-semibold text-emerald-600 tracking-widest">{submittedData.otp}</span>
                 </div>
                 <div className="flex justify-between pt-0.5 items-center">
                   <span className="text-gray-500">id_proof (UploadFile)</span>
@@ -1175,14 +1655,19 @@ async def register(
                 <pre className="bg-[#1E1E24] text-gray-200 p-3.5 rounded-2xl text-[11px] font-mono overflow-x-auto leading-relaxed">
 {`@app.post("/api/auth/register")
 async def register(
-    full_name: str = Form(...),
+    name: str = Form(...),
     email: str = Form(...),
+    phonenumber: str = Form(...),
+    collegename: str = Form(...),
+    department: str = Form(...),
     password: str = Form(...),
     role: str = Form(...), # "student" | "faculty"
     id_number: str = Form(...),
+    otp: str = Form(...),
     id_proof: UploadFile = File(...)
 ):
-    return {"message": "Account created", "role": role}`}
+    # Verify OTP and validate campus ID proof
+    return {"status": "success", "message": "Account created successfully", "role": role}`}
                 </pre>
               </div>
             </div>
